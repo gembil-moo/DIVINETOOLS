@@ -55,6 +55,8 @@ local function saveConfig(config)
         file:write("    }\n")
         file:write("}\n")
         file:close()
+    else
+        print(red.."Error: Could not save config. Make sure 'config' folder exists."..reset)
     end
 end
 
@@ -142,9 +144,10 @@ local function configMenu()
                         border()
                         io.write(yellow.."Select package(s) (e.g. 1,3,4 or ENTER for all): "..reset)
                         local input = io.read()
+                        if input then input = input:gsub("%s+", "") end
                         
                         local selected_indices = {}
-                        if input == "" then
+                        if not input or input == "" then
                             for i = 1, #scanned_packages do table.insert(selected_indices, i) end
                         else
                             for str in string.gmatch(input, "([^,]+)") do
@@ -155,6 +158,7 @@ local function configMenu()
 
                         if #selected_indices > 0 then
                             local config = loadConfig()
+                            if not config.packages then config.packages = {} end
                             local exists = {}
                             for _, p in ipairs(config.packages) do exists[p] = true end
                             
