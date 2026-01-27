@@ -54,6 +54,16 @@ local function saveConfig(config)
     end
 end
 
+local function getUsername(pkg)
+    local handle = io.popen("su -c 'cat /data/data/" .. pkg .. "/shared_prefs/prefs.xml 2>/dev/null'")
+    if not handle then return nil end
+    local content = handle:read("*a")
+    handle:close()
+    
+    local user = content:match('name="username">([^<]+)<')
+    return user
+end
+
 -- ===== SUB MENU CONFIG (UPDATED) =====
 local function configMenu()
     while true do
@@ -91,6 +101,18 @@ local function configMenu()
 
             if sub_c == "1" then
                 print(green.."Showing APK Package List..."..reset)
+                local cfg = loadConfig()
+                border()
+                if #cfg.packages == 0 then
+                    print(red.."  No packages saved."..reset)
+                else
+                    for i, pkg in ipairs(cfg.packages) do
+                        local user = getUsername(pkg)
+                        local status = user and (green .. " (" .. user .. ")" .. reset) or (red .. " (Not Logged In)" .. reset)
+                        print("  ["..i.."] " .. pkg .. status)
+                    end
+                end
+                border()
             elseif sub_c == "2" then
                 border()
                 print("        "..green.."✦ EDIT APK LIST ✦"..reset)
