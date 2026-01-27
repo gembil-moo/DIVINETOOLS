@@ -564,6 +564,53 @@ while true do
             io.write(yellow.."Relaunch Loop Delay (minutes) [ENTER=0]: "..reset)
             config.delay_relaunch = tonumber(io.read()) or 0
 
+            -- 7. Auto Execute Script Injection
+            border()
+            io.write(yellow.."Inject auto exe script? (y/n): "..reset)
+            if io.read():lower() == "y" then
+                local script_num = 1
+                while true do
+                    io.write(yellow.."\nInject script "..script_num.."? (y/n): "..reset)
+                    if io.read():lower() ~= "y" then break end
+
+                    print(green.."Enter script content (loadstring etc).")
+                    print(yellow.."Type 'END' on a new line to finish:"..reset)
+                    
+                    local lines = {}
+                    while true do
+                        local line = io.read()
+                        if line == "END" then break end
+                        table.insert(lines, line)
+                    end
+                    local content = table.concat(lines, "\n")
+
+                    -- Detect Executor Folders
+                    local targets = {}
+                    local delta_dir = "/storage/emulated/0/Delta/Autoexecute"
+                    local fluxus_dir = "/storage/emulated/0/FluxusZ/autoexec"
+                    
+                    -- Helper to check directory existence
+                    local function exists(path)
+                        local h = io.popen("ls -d " .. path .. " 2>/dev/null")
+                        local res = h:read("*a")
+                        h:close()
+                        return res and res ~= ""
+                    end
+
+                    if exists("/storage/emulated/0/Delta") then table.insert(targets, delta_dir) end
+                    if exists("/storage/emulated/0/FluxusZ") then table.insert(targets, fluxus_dir) end
+                    if #targets == 0 then table.insert(targets, delta_dir) end -- Default to Delta if none found
+
+                    for _, dir in ipairs(targets) do
+                        os.execute("mkdir -p " .. dir)
+                        local f = io.open(dir .. "/script_" .. script_num .. ".txt", "w")
+                        if f then f:write(content) f:close() end
+                    end
+                    print(green.."Script saved to auto-execute folder(s)."..reset)
+                    script_num = script_num + 1
+                end
+            end
+
             -- Save
             saveConfig(config)
             print(green.."\nConfiguration saved successfully!"..reset)
