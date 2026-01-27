@@ -26,7 +26,7 @@ local function printBanner()
 end
 
 -- ===== CONFIG HELPER (LUA FORMAT) =====
-local CONFIG_PATH = "config/config.lua"
+local CONFIG_PATH = "config.lua"
 
 local function loadConfig()
     -- Coba load file config.lua
@@ -56,7 +56,7 @@ local function saveConfig(config)
         file:write("}\n")
         file:close()
     else
-        print(red.."Error: Could not save config. Make sure 'config' folder exists."..reset)
+        print(red.."Error: Could not save config."..reset)
     end
 end
 
@@ -162,15 +162,23 @@ local function configMenu()
                             local exists = {}
                             for _, p in ipairs(config.packages) do exists[p] = true end
                             
-                            local added_count = 0
+                            local packages_added = {}
                             for _, idx in ipairs(selected_indices) do
-                                if not exists[scanned_packages[idx]] then
-                                    table.insert(config.packages, scanned_packages[idx])
-                                    added_count = added_count + 1
+                                local pkg_name = scanned_packages[idx]
+                                if not exists[pkg_name] then
+                                    table.insert(config.packages, pkg_name)
+                                    table.insert(packages_added, pkg_name)
+                                    -- Tandai sudah ada untuk mencegah duplikasi dari input yang sama (misal: 1,1)
+                                    exists[pkg_name] = true
                                 end
                             end
-                            saveConfig(config)
-                            print(green.."Saved "..added_count.." new package(s) to config/config.lua!"..reset)
+
+                            if #packages_added > 0 then
+                                saveConfig(config)
+                                print(green.."Saved "..#packages_added.." new package(s) to config/config.lua!"..reset)
+                            else
+                                print(yellow.."No new packages were added. They may already exist in the config."..reset)
+                            end
                         else
                             print(red.."Invalid selection!"..reset)
                         end
