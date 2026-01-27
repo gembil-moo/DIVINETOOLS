@@ -5,6 +5,9 @@ local red     = "\27[31m"
 local yellow  = "\27[33m"
 local reset   = "\27[0m"
 
+-- Muat library CJSON untuk konfigurasi
+local cjson = require "cjson"
+
 local function border(width)
     width = width or 50
     print(red .. string.rep("═", width) .. reset)
@@ -25,35 +28,32 @@ local function printBanner()
     end
 end
 
--- ===== CONFIG HELPER (LUA FORMAT) =====
-local CONFIG_PATH = "config.lua"
+-- ===== CONFIG HELPER (JSON FORMAT) =====
+local CONFIG_PATH = "config.json"
 
 local function loadConfig()
-    -- Coba load file config.lua
-    local chunk, err = loadfile(CONFIG_PATH)
-    if chunk then
-        -- Jika berhasil, jalankan chunk untuk mendapatkan tabel
-        local success, result = pcall(chunk)
-        if success and type(result) == "table" then
-            return result
-        end
+    local file = io.open(CONFIG_PATH, "r")
+    local config = {}
+    if file then
+        local content = file:read("*a")
+        file:close()
+        local success, result = pcall(cjson.decode, content)
+        if success then config = result end
     end
-    -- Default jika file tidak ada atau error
-    return {packages = {}}
+
+    -- Set default values if they don't exist
+    if not config.packages then config.packages = {} end
+    if not config.private_servers then
+        config.private_servers = { mode = "same", url = "", urls = {} }
+    end
+    return config
 end
 
 local function saveConfig(config)
     local file = io.open(CONFIG_PATH, "w")
     if file then
-        file:write("return {\n")
-        file:write("    packages = {\n")
-        if config.packages then
-            for _, pkg in ipairs(config.packages) do
-                file:write(string.format("        %q,\n", pkg))
-            end
-        end
-        file:write("    }\n")
-        file:write("}\n")
+        -- Gunakan cjson untuk menyimpan dengan format yang rapi
+        file:write(cjson.encode_pretty(config))
         file:close()
     else
         print(red.."Error: Could not save config."..reset)
@@ -196,8 +196,59 @@ local function configMenu()
             end
 
         elseif c == "2" then
-            print(green.."Opening Private Server List..."..reset)
+            os.execute("clear")
+            border()
+            print("        "..green.."✦ PRIVATE SERVER LIST ✦"..reset)
+            border()
 
+            local config = loadConfig()
+
+            -- Tampilkan pengaturan saat ini
+            print(yellow.."Current Mode: "..reset .. (config.private_servers.mode or "not set"))
+            if config.private_servers.mode == "same" then
+                print(yellow.."URL: "..reset .. (config.private_servers.url or "not set"))
+            elseif config.private_servers.mode == "per_package" then
+                print(yellow.."URLs per Package:"..reset)
+                if config.private_servers.urls and next(config.private_servers.urls) then
+                     for pkg, url in pairs(config.private_servers.urls) do
+                        print("  - " .. pkg .. ": " .. url)
+                     end
+                else
+                    print("  (No URLs set)")
+                end
+            end
+            border()
+
+            io.write(yellow.."Use the same link for all packages? (y/n): "..reset)
+            local choice = io.read()
+
+            if choice:lower() == 'y' then
+                io.write(yellow.."Enter the single private server URL: "..reset)
+                local url = io.read()
+                config.private_servers.mode = "same"
+                config.private_servers.url = url
+                config.private_servers.urls = {} -- Hapus data mode lain
+                saveConfig(config)
+                print(green.."\nSaved single URL configuration!"..reset)
+            elseif choice:lower() == 'n' then
+                if #config.packages == 0 then
+                    print(red.."\nNo packages found. Please add packages first in menu [1]."..reset)
+                else
+                    config.private_servers.mode = "per_package"
+                    config.private_servers.url = "" -- Hapus data mode lain
+                    print(yellow.."\nEnter the URL for each package (press ENTER to keep current):"..reset)
+                    for _, pkg in ipairs(config.packages) do
+                        local current_url = config.private_servers.urls[pkg] or ""
+                        io.write("  - " .. pkg .. " ["..current_url.."]: "..reset)
+                        local new_url = io.read()
+                        if new_url and new_url ~= "" then config.private_servers.urls[pkg] = new_url end
+                    end
+                    saveConfig(config)
+                    print(green.."\nSaved per-package URL configuration!"..reset)
+                end
+            else
+                print(red.."\nInvalid choice. No changes made."..reset)
+            end
         elseif c == "3" then
             print(green.."Opening Script Manager..."..reset)
 
