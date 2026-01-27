@@ -198,7 +198,7 @@ while true do
     local p = io.read()
 
     if p == "1" then
-        local config = loadConfig()
+        local cfg = loadConfig()
         if #cfg.packages == 0 then print(red.."No Packages!"..reset) io.read() else
             RunSilent("clear")
             local scrW, scrH = GetScreenResolution()
