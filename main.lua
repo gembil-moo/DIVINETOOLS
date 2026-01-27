@@ -60,6 +60,16 @@ local function saveConfig(config)
     end
 end
 
+local function getUsername(pkg)
+    local handle = io.popen("su -c 'cat /data/data/" .. pkg .. "/shared_prefs/prefs.xml 2>/dev/null'")
+    if not handle then return nil end
+    local content = handle:read("*a")
+    handle:close()
+    
+    local user = content:match('name="username">([^<]+)<')
+    return user
+end
+
 -- ===== SUB MENU CONFIG (UPDATED) =====
 local function configMenu()
     while true do
@@ -103,7 +113,9 @@ local function configMenu()
                     print(red.."  No packages saved."..reset)
                 else
                     for i, pkg in ipairs(cfg.packages) do
-                        print("  ["..i.."] " .. pkg)
+                        local user = getUsername(pkg)
+                        local status = user and (green .. " (" .. user .. ")" .. reset) or (red .. " (Not Logged In)" .. reset)
+                        print("  ["..i.."] " .. pkg .. status)
                     end
                 end
                 border()
@@ -186,8 +198,28 @@ local function configMenu()
                         print(red.."No com.roblox packages found."..reset)
                     end
                 elseif edit_c == "2" then
-                    -- Implementasi Remove Package bisa ditambahkan di sini
-                    print(green.."Feature coming soon..."..reset)
+                    border()
+                    print("        "..green.."✦ REMOVE PACKAGE ✦"..reset)
+                    border()
+                    
+                    local config = loadConfig()
+                    if #config.packages == 0 then
+                        print(red.."  No packages saved."..reset)
+                    else
+                        for i, pkg in ipairs(config.packages) do
+                            print("  ["..i.."] " .. pkg)
+                        end
+                        border()
+                        io.write(yellow.."Select package index to remove: "..reset)
+                        local idx = tonumber(io.read())
+                        if idx and config.packages[idx] then
+                            table.remove(config.packages, idx)
+                            saveConfig(config)
+                            print(green.."Package removed successfully!"..reset)
+                        else
+                            print(red.."Invalid selection!"..reset)
+                        end
+                    end
                 end
             elseif sub_c == "3" then
                 -- Back to Config Menu
