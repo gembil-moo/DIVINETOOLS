@@ -4,6 +4,7 @@ local green   = "\27[38;5;46m"
 local red     = "\27[31m"
 local yellow  = "\27[33m"
 local reset   = "\27[0m"
+local white   = "\27[37m"
 
 -- Muat library CJSON untuk konfigurasi
 local cjson = require "cjson"
@@ -13,19 +14,12 @@ local function border(width)
     print(red .. string.rep("═", width) .. reset)
 end
 
-local divine = {
-"██████╗ ██╗██╗   ██╗██╗███╗   ██╗███████╗",
-"██╔══██╗██║██║   ██║██║████╗  ██║██╔════╝",
-"██║  ██║██║██║   ██║██║██╔██╗ ██║█████╗  ",
-"██║  ██║██║╚██╗ ██╔╝██║██║╚██╗██║██╔══╝  ",
-"██████╔╝██║ ╚████╔╝ ██║██║ ╚████║███████╗",
-"╚═════╝ ╚═╝  ╚═══╝  ╚═╝╚═╝  ╚═══╝╚══════╝"
-}
-
+-- ===== UI VISUAL (COMPACT VERSION) =====
 local function printBanner()
-    for _, line in ipairs(divine) do
-        print(iceblue .. line .. reset)
-    end
+    io.write("\27[2J\27[H") -- Clear Screen Total
+    print(iceblue.."========================================"..reset)
+    print(iceblue.."   🚀 DIVINE MANAGER PRO (LITE) 🚀      "..reset)
+    print(iceblue.."========================================"..reset)
 end
 
 -- ===== CONFIG HELPER (JSON FORMAT) =====
@@ -196,42 +190,54 @@ local function CalculateBounds(index, total_pkg, screenW, screenH)
 end
 
 local function GetSystemMemory()
-    local handle = io.popen("free -m | awk '/Mem:/ {print $3 \" / \" $2 \" MB\"}'")
-    if not handle then return "N/A" end
+    local handle = io.popen("free -m")
+    if not handle then return "N/A", 0 end
     local result = handle:read("*a")
     handle:close()
-    return result and result:gsub("\n", "") or "N/A"
+    local total, used, free = result:match("Mem:%s+(%d+)%s+(%d+)%s+(%d+)")
+    if total and free then
+        local pct = math.floor((tonumber(free)/tonumber(total))*100)
+        return free.."MB", pct
+    end
+    return "N/A", 0
 end
 
-local function DrawDashboard(statuses, config)
-    os.execute("clear")
-    print(iceblue.."╔══════════════════════════════════════════════════╗"..reset)
-    print(iceblue.."║           🚀 DIVINE MONITOR DASHBOARD 🚀         ║"..reset)
-    print(iceblue.."╠══════════════════════════════════════════════════╣"..reset)
-    print(iceblue.."║"..yellow.." MEMORY: "..reset..string.format("%-36s", GetSystemMemory())..iceblue.."║"..reset)
-    print(iceblue.."║"..yellow.." TIME  : "..reset..string.format("%-36s", os.date("%H:%M:%S"))..iceblue.."║"..reset)
-    print(iceblue.."╠══════════════════════════════════════════════════╣"..reset)
-    print(iceblue.."║ NO  | PACKAGE                   | STATUS         ║"..reset)
-    print(iceblue.."╠══════════════════════════════════════════════════╣"..reset)
+local function DrawDashboard(packages, statuses, title_status)
+    io.write("\27[H") -- Reset Kursor ke Atas (Gak kedip)
     
-    for i, pkg in ipairs(config.packages) do
-        local s = statuses[pkg] or "IDLE"
-        local color = reset
-        if s == "ONLINE" then color = green
-        elseif s == "LAUNCHING" then color = iceblue
-        elseif s == "RESETTING" then color = red
-        elseif s:find("WAITING") then color = yellow
-        elseif s == "OPTIMIZING" then color = "\27[35m"
+    local memFree, memPct = GetSystemMemory()
+    local colorMem = (tonumber(memPct) > 20) and green or red 
+    
+    -- HEADER (Tanpa Box Samping)
+    print(iceblue.."========================================"..reset)
+    print(white.." DIVINE MONITOR v3.5                    "..reset)
+    print(iceblue.."========================================"..reset)
+    print(yellow.." RAM    : "..colorMem..memFree.." ("..memPct.."%)"..reset)
+    print(yellow.." ACTION : "..white..title_status..reset)
+    print(iceblue.."----------------------------------------"..reset)
+    print(white.." NO  PACKAGE        STATUS              "..reset)
+    print(iceblue.."----------------------------------------"..reset)
+    
+    -- LOOP PACKAGE (Format Ramping)
+    for i, pkg in ipairs(packages) do
+        -- Nama dipotong jadi max 10 huruf biar muat
+        local shortName = pkg:gsub("com.roblox.", ""):sub(1, 10)
+        local status = statuses[pkg] or "Idle"
+        
+        -- Warna Status
+        local sColor = white
+        if status == "Online" then sColor = green
+        elseif status == "Optimizing..." then sColor = yellow
+        elseif status == "Resetting..." then sColor = red
+        elseif status == "Launching..." then sColor = iceblue
         end
         
-        local user = getUsername(pkg)
-        local display_name = user and (config.mask_username and maskString(user) or user) or pkg
-        if #display_name > 23 then display_name = display_name:sub(1, 20).."..." end
-        
-        print(iceblue.."║"..reset..string.format(" %-3d | %-25s | %s%-14s", i, display_name, color, s)..iceblue.." ║"..reset)
+        -- Format: [1] dodol...    Online
+        print(string.format("%s [%d] %-12s %s%s%s", iceblue, i, shortName, sColor, status, reset))
     end
-    print(iceblue.."╚══════════════════════════════════════════════════╝"..reset)
-    print(iceblue.." [CTRL+C] to Stop Monitor"..reset)
+    print(iceblue.."========================================"..reset)
+    -- Bersihkan sisa baris bawah (biar gak ada ghosting)
+    print("\27[J") 
 end
 
 -- ===== SUB MENU CONFIG (UPDATED) =====
@@ -676,14 +682,14 @@ while true do
 
             -- Initialize Status
             local statuses = {}
-            for _, pkg in ipairs(config.packages) do statuses[pkg] = "IDLE" end
+            for _, pkg in ipairs(config.packages) do statuses[pkg] = "Idle" end
             
             -- Main Loop
             while true do
                 -- === PHASE 1: OPTIMIZING (REAL ACTION: TEXTURE NUKE) ===
                 for _, pkg in ipairs(config.packages) do
-                    statuses[pkg] = "OPTIMIZING"
-                    DrawDashboard(statuses, config)
+                    statuses[pkg] = "Optimizing..."
+                    DrawDashboard(config.packages, statuses, "OPTIMIZING")
                     
                     -- Force stop & Nuke Textures
                     os.execute("am force-stop "..pkg.." >/dev/null 2>&1")
@@ -703,8 +709,8 @@ while true do
 
                 -- 2. Launching
                 for i, pkg in ipairs(config.packages) do
-                    statuses[pkg] = "LAUNCHING"
-                    DrawDashboard(statuses, config)
+                    statuses[pkg] = "Launching..."
+                    DrawDashboard(config.packages, statuses, "LAUNCHING")
                     
                     local bounds = CalculateBounds(i, #config.packages, sw, sh)
                     local ps_url = (config.private_servers.mode == "same") and config.private_servers.url or config.private_servers.urls[pkg]
@@ -718,14 +724,14 @@ while true do
                     
                     if config.delay_launch > 0 then
                         for d = config.delay_launch, 1, -1 do
-                            statuses[pkg] = "WAITING ("..d.."s)"
-                            DrawDashboard(statuses, config)
+                            statuses[pkg] = "Waiting ("..d.."s)"
+                            DrawDashboard(config.packages, statuses, "DELAY LAUNCH")
                             os.execute("sleep 1")
                         end
                     end
                     
-                    statuses[pkg] = "ONLINE"
-                    DrawDashboard(statuses, config)
+                    statuses[pkg] = "Online"
+                    DrawDashboard(config.packages, statuses, "LAUNCHED")
                 end
 
                 -- 3. Keep-Alive / Monitor Phase
@@ -753,13 +759,13 @@ while true do
                 if loop_delay > 0 then
                     local start_time = os.time()
                     while (os.time() - start_time) < loop_delay do
-                        DrawDashboard(statuses, config)
+                        DrawDashboard(config.packages, statuses, "MONITORING")
                         if checkSignal() then break end -- Break loop untuk restart
                         os.execute("sleep 1")
                     end
                 else
                     while true do
-                        DrawDashboard(statuses, config)
+                        DrawDashboard(config.packages, statuses, "MONITORING")
                         if checkSignal() then break end -- Break loop untuk restart
                         os.execute("sleep 5")
                     end
