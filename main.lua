@@ -120,33 +120,6 @@ local function installDivineMonitor(config)
     end
 end
 
--- Fungsi Kirim Webhook via Termux (CURL)
-local function SendWebhook(reason)
-    local cfg = loadConfig()
-    if not cfg.webhook.url or cfg.webhook.url == "" then return end
-
-    -- Sanitize reason untuk mencegah error JSON
-    reason = string.gsub(tostring(reason), '"', '\\"')
-
-    local msg = {
-        username = "DVN Manager",
-        content = (cfg.webhook.tag_everyone and "@everyone " or "") .. "⚠️ **STATUS ALERT!**",
-        embeds = {{
-            title = "Action Required",
-            description = "Reason: " .. reason,
-            color = 16711680, -- Merah
-            footer = { text = "Sent from Divine Termux Tool" }
-        }}
-    }
-    
-    -- Convert table ke JSON string (menggunakan cjson yang sudah ada agar lebih aman)
-    local json_body = cjson.encode(msg)
-
-    -- Eksekusi CURL diam-diam
-    local cmd = "curl -H \"Content-Type: application/json\" -d '"..json_body.."' \""..cfg.webhook.url.."\" > /dev/null 2>&1"
-    os.execute(cmd)
-end
-
 local function CalculateBounds(index, total_pkg, screenW, screenH)
     -- === CONFIGURASI GRID PINTAR ===
     local cols, rows
@@ -680,24 +653,15 @@ while true do
             
             -- Main Loop
             while true do
-                -- === PHASE 1: OPTIMIZING (REAL ACTION: TEXTURE NUKE) ===
-                for _, pkg in ipairs(config.packages) do
+                -- 1. Optimizing & Resetting
+                for i, pkg in ipairs(config.packages) do
                     statuses[pkg] = "OPTIMIZING"
                     DrawDashboard(statuses, config)
-                    
-                    -- Force stop & Nuke Textures
                     os.execute("am force-stop "..pkg.." >/dev/null 2>&1")
+                    os.execute("sleep 0.2")
                     
-                    local paths = {"/files/content/textures", "/files/content/sky"}
-                    for _, sub in ipairs(paths) do
-                         local full = "/data/data/"..pkg..sub
-                         os.execute("rm -rf "..full)
-                         os.execute("touch "..full)
-                         os.execute("chmod 444 "..full)
-                    end
-                    
-                    -- Bersihkan Cache
-                    os.execute("pm trim-caches 128G")
+                    statuses[pkg] = "RESETTING"
+                    DrawDashboard(statuses, config)
                     os.execute("sleep 0.2")
                 end
 
@@ -730,37 +694,15 @@ while true do
 
                 -- 3. Keep-Alive / Monitor Phase
                 local loop_delay = (config.delay_relaunch > 0) and (config.delay_relaunch * 60) or 0
-                
-                -- Helper untuk cek sinyal restart dari Divine.lua
-                local function checkSignal()
-                    local paths = {
-                        "/storage/emulated/0/Delta/Workspace/divine_relaunch.req",
-                        "/storage/emulated/0/FluxusZ/workspace/divine_relaunch.req"
-                    }
-                    for _, sig in ipairs(paths) do
-                        local f = io.open(sig, "r")
-                        if f then
-                            local reason = f:read("*a")
-                            f:close()
-                            os.execute("rm "..sig)
-                            SendWebhook(reason)
-                            return true -- Sinyal ditemukan, minta restart
-                        end
-                    end
-                    return false
-                end
-
                 if loop_delay > 0 then
                     local start_time = os.time()
                     while (os.time() - start_time) < loop_delay do
                         DrawDashboard(statuses, config)
-                        if checkSignal() then break end -- Break loop untuk restart
                         os.execute("sleep 1")
                     end
                 else
                     while true do
                         DrawDashboard(statuses, config)
-                        if checkSignal() then break end -- Break loop untuk restart
                         os.execute("sleep 5")
                     end
                 end
