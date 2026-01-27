@@ -1,35 +1,22 @@
 #!/bin/bash
 
-echo "[*] Setting up DIVINETOOLS environment..."
+echo "💎 INSTALLING DIVINE TOOLS (LITE)..."
 
-# Termux storage
+# 1. Setup Storage
 termux-setup-storage
 
-# Update system
+# 2. Update System
 pkg update -y && pkg upgrade -y
 
-# Install system packages
-pkg install -y \
-lua53 \
-luarocks \
-python \
-tsu \
-figlet \
-toilet \
-ncurses-utils \
-android-tools
+# 3. Install Paket Wajib (Cukup ini aja)
+# lua-cjson dari pkg jauh lebih stabil daripada luarocks
+pkg install -y git lua54 lua-cjson curl tsu android-tools
 
-# Install Lua modules
-echo "[*] Installing Lua modules..."
-luarocks install lua-cjson
-luarocks install luasocket
+# 4. Hapus folder config lama (reset) & buat baru
+mkdir -p config
 
-# Install Python libraries
-echo "[*] Installing Python packages..."
-pip install -r requirements.txt
-
-# Permission
+# 5. Izin Eksekusi
 chmod +x run.sh
 
-echo "[+] Installation complete!"
-echo "[+] Run with: ./run.sh"
+echo "✅ INSTALLATION SUCCESS!"
+echo "Jalankan dengan perintah: bash run.sh"
