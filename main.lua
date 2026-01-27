@@ -46,6 +46,9 @@ local function loadConfig()
     if not config.private_servers then
         config.private_servers = { mode = "same", url = "", urls = {} }
     end
+    if not config.webhook then
+        config.webhook = { enabled = false, url = "", mode = "new", interval = 5, tag_everyone = false }
+    end
     return config
 end
 
@@ -285,7 +288,63 @@ local function configMenu()
             print(green.."Opening Script Manager..."..reset)
 
         elseif c == "4" then
-            print(green.."Configuring Webhook..."..reset)
+            border()
+            print("        "..green.."✦ WEBHOOK CONFIGURATION ✦"..reset)
+            border()
+
+            local config = loadConfig()
+            
+            -- Display current config
+            print(yellow.."Current Status: "..reset .. (config.webhook.enabled and (green.."Enabled"..reset) or (red.."Disabled"..reset)))
+            if config.webhook.enabled then
+                print(yellow.."URL: "..reset .. (config.webhook.url ~= "" and config.webhook.url:sub(1, 40).."..." or "Not Set"))
+                print(yellow.."Mode: "..reset .. (config.webhook.mode == "edit" and "Edit Message" or "New Message"))
+                print(yellow.."Interval: "..reset .. config.webhook.interval .. " minutes")
+                print(yellow.."Tag Everyone: "..reset .. (config.webhook.tag_everyone and "Yes" or "No"))
+            end
+            border()
+
+            io.write(yellow.."Enable Webhook? (y/n): "..reset)
+            local enable_input = io.read():lower()
+
+            if enable_input == "n" then
+                config.webhook.enabled = false
+                saveConfig(config)
+                print(red.."\nWebhook disabled."..reset)
+            elseif enable_input == "y" then
+                config.webhook.enabled = true
+                
+                io.write(yellow.."Enter Webhook URL: "..reset)
+                local url = io.read()
+                if url and url ~= "" then config.webhook.url = url end
+
+                print(yellow.."\nSelect Mode:"..reset)
+                print("  [1] Send New Message")
+                print("  [2] Edit Existing Message")
+                io.write(yellow.."Choose (1-2): "..reset)
+                local mode_sel = io.read()
+                config.webhook.mode = (mode_sel == "2") and "edit" or "new"
+
+                while true do
+                    io.write(yellow.."\nUpdate Interval (min 5 mins): "..reset)
+                    local interval = tonumber(io.read())
+                    if interval and interval >= 5 then
+                        config.webhook.interval = interval
+                        break
+                    else
+                        print(red.."Interval must be at least 5 minutes!"..reset)
+                    end
+                end
+
+                io.write(yellow.."\nTag @everyone? (y/n): "..reset)
+                local tag = io.read():lower()
+                config.webhook.tag_everyone = (tag == "y")
+
+                saveConfig(config)
+                print(green.."\nWebhook configuration saved!"..reset)
+            else
+                print(red.."\nInvalid option. No changes made."..reset)
+            end
 
         elseif c == "5" then
             print(green.."Setting Delay Launch..."..reset)
