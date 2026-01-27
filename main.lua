@@ -53,7 +53,7 @@ local function saveConfig(config)
     local file = io.open(CONFIG_PATH, "w")
     if file then
         -- Gunakan cjson untuk menyimpan dengan format yang rapi
-        file:write(cjson.encode_pretty(config))
+        file:write(cjson.encode(config))
         file:close()
     else
         print(red.."Error: Could not save config."..reset)
