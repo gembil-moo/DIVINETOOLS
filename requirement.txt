@@ -1,0 +1,4 @@
+termux-setup-storage
+pkg update -y && pkg upgrade -y
+pkg install -y lua53 tsu python figlet toilet ncurses-utils android-tools
+pip install pyfiglet rich
