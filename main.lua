@@ -25,31 +25,35 @@ local function printBanner()
     end
 end
 
--- ===== CONFIG HELPER =====
+-- ===== CONFIG HELPER (LUA FORMAT) =====
+local CONFIG_PATH = "config/config.lua"
+
 local function loadConfig()
-    local file = io.open("config.json", "r")
-    if not file then return {packages = {}} end
-    local content = file:read("*a")
-    file:close()
-    
-    local packages = {}
-    local list_part = content:match('"packages"%s*:%s*%[(.-)%]')
-    if list_part then
-        for pkg in list_part:gmatch('"([^"]+)"') do
-            table.insert(packages, pkg)
+    -- Coba load file config.lua
+    local chunk, err = loadfile(CONFIG_PATH)
+    if chunk then
+        -- Jika berhasil, jalankan chunk untuk mendapatkan tabel
+        local success, result = pcall(chunk)
+        if success and type(result) == "table" then
+            return result
         end
     end
-    return {packages = packages}
+    -- Default jika file tidak ada atau error
+    return {packages = {}}
 end
 
 local function saveConfig(config)
-    local file = io.open("config.json", "w")
+    local file = io.open(CONFIG_PATH, "w")
     if file then
-        file:write('{\n  "packages": [\n')
-        for i, pkg in ipairs(config.packages) do
-            file:write('    "' .. pkg .. '"' .. (i < #config.packages and "," or "") .. "\n")
+        file:write("return {\n")
+        file:write("    packages = {\n")
+        if config.packages then
+            for _, pkg in ipairs(config.packages) do
+                file:write(string.format("        %q,\n", pkg))
+            end
         end
-        file:write('  ]\n}')
+        file:write("    }\n")
+        file:write("}\n")
         file:close()
     end
 end
@@ -91,6 +95,19 @@ local function configMenu()
 
             if sub_c == "1" then
                 print(green.."Showing APK Package List..."..reset)
+                local cfg = loadConfig()
+                border()
+                if #cfg.packages == 0 then
+                    print(red.."  No packages saved."..reset)
+                else
+                    for i, pkg in ipairs(cfg.packages) do
+                        print("  ["..i.."] " .. pkg)
+                    end
+                end
+                border()
+                print("\nPress ENTER to return...")
+                io.read()
+
             elseif sub_c == "2" then
                 border()
                 print("        "..green.."✦ EDIT APK LIST ✦"..reset)
@@ -149,7 +166,7 @@ local function configMenu()
                                 end
                             end
                             saveConfig(config)
-                            print(green.."Saved "..added_count.." new package(s) to config.json!"..reset)
+                            print(green.."Saved "..added_count.." new package(s) to config/config.lua!"..reset)
                         else
                             print(red.."Invalid selection!"..reset)
                         end
@@ -157,26 +174,8 @@ local function configMenu()
                         print(red.."No com.roblox packages found."..reset)
                     end
                 elseif edit_c == "2" then
-                    border()
-                    print("        "..green.."✦ REMOVE PACKAGE ✦"..reset)
-                    border()
-                    print("  [1] Remove Package")
-                    print("  [2] Remove All Package")
-                    border()
-                    io.write(yellow.."Select option (1-2): "..reset)
-                    local remove_c = io.read()
-
-                    os.execute("clear")
-
-                    if remove_c == "1" then
-                        print(green.."Removing Package..."..reset)
-                    elseif remove_c == "2" then
-                        print(green.."Removing All Packages..."..reset)
-                    else
-                        print(red.."Invalid option!"..reset)
-                    end
-                else
-                    print(red.."Invalid option!"..reset)
+                    -- Implementasi Remove Package bisa ditambahkan di sini
+                    print(green.."Feature coming soon..."..reset)
                 end
             elseif sub_c == "3" then
                 -- Back to Config Menu
@@ -206,8 +205,10 @@ local function configMenu()
             print(red.."Invalid option!"..reset)
         end
 
-        print("\nPress ENTER to return...")
-        io.read()
+        if c ~= "1" then -- Pause for non-submenu items
+            print("\nPress ENTER to return...")
+            io.read()
+        end
     end
 end
 
