@@ -120,6 +120,54 @@ local function installDivineMonitor(config)
     end
 end
 
+local function CalculateBounds(index, total_pkg, screenW, screenH)
+    -- === CONFIGURASI GRID PINTAR ===
+    local cols, rows
+    local y_offset = 0 -- Jarak aman dari atas (buat Termux/Status)
+
+    if total_pkg == 1 then
+        -- KASUS 1 AKUN (CINEMA MODE)
+        local margin_top = math.floor(screenH * 0.15) 
+        local margin_bot = math.floor(screenH * 0.05) 
+        return string.format("0,%d,%d,%d", margin_top, screenW, screenH - margin_bot)
+
+    elseif total_pkg == 2 then
+        -- KASUS 2 AKUN (DUAL STACK)
+        cols = 1
+        rows = 2
+        y_offset = 120 
+
+    elseif total_pkg <= 8 then
+        -- KASUS 3-8 AKUN (GRID 2 KOLOM)
+        cols = 2
+        rows = math.ceil(total_pkg / 2)
+        if rows < 2 then rows = 2 end
+        y_offset = 80 
+
+    else 
+        -- KASUS 9+ AKUN (GRID 3 KOLOM)
+        cols = 3
+        rows = math.ceil(total_pkg / 3)
+        y_offset = 60 
+    end
+
+    -- === RUMUS MATEMATIKA GRID ===
+    local usable_H = screenH - y_offset
+    local w = math.floor(screenW / cols)
+    local h = math.floor(usable_H / rows)
+    
+    local i = index - 1 
+    local c = i % cols
+    local r = math.floor(i / cols)
+
+    local x1 = c * w
+    local y1 = y_offset + (r * h)
+    local x2 = x1 + w
+    local y2 = y1 + h
+
+    return string.format("%d,%d,%d,%d", x1, y1, x2, y2)
+end
+
 -- ===== SUB MENU CONFIG (UPDATED) =====
 local function configMenu()
     while true do
