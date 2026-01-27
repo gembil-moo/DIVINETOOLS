@@ -51,6 +51,7 @@ local function loadConfig()
     end
     if not config.delay_launch then config.delay_launch = 0 end
     if not config.delay_relaunch then config.delay_relaunch = 0 end
+    if config.mask_username == nil then config.mask_username = false end
     return config
 end
 
@@ -74,6 +75,11 @@ local function getUsername(pkg)
     
     local user = content and content:match('name="username">([^<]+)<') or nil
     return user
+end
+
+local function maskString(str)
+    if not str or #str <= 4 then return str end
+    return str:sub(1, 3) .. "xxx" .. str:sub(-2)
 end
 
 -- ===== SUB MENU CONFIG (UPDATED) =====
@@ -120,7 +126,8 @@ local function configMenu()
                 else
                     for i, pkg in ipairs(cfg.packages) do
                         local user = getUsername(pkg)
-                        local status = user and (green .. " (" .. user .. ")" .. reset) or (red .. " (Not Logged In)" .. reset)
+                        local display_user = (user and cfg.mask_username) and maskString(user) or user
+                        local status = user and (green .. " (" .. display_user .. ")" .. reset) or (red .. " (Not Logged In)" .. reset)
                         print("  ["..i.."] " .. pkg .. status)
                     end
                 end
@@ -427,7 +434,116 @@ while true do
         print(green.."Starting application..."..reset)
 
     elseif pilih == "2" then
-        print(green.."Running first configuration..."..reset)
+        border()
+        print("        "..green.."✦ FIRST CONFIGURATION ✦"..reset)
+        border()
+
+        local config = loadConfig()
+
+        -- 1. Auto Detect Packages
+        print(green.."[*] Scanning for com.roblox packages..."..reset)
+        local handle = io.popen("pm list packages | grep com.roblox")
+        local result = handle:read("*a")
+        handle:close()
+
+        local scanned = {}
+        for line in result:gmatch("[^\r\n]+") do
+            local p = line:match("package:(.*)")
+            if p then table.insert(scanned, p) end
+        end
+
+        if #scanned == 0 then
+            print(red.."No packages found! Install Roblox first."..reset)
+        else
+            print(yellow.."Found "..#scanned.." packages:"..reset)
+            for i, p in ipairs(scanned) do print("  ["..i.."] "..p) end
+            
+            io.write(yellow.."\nPress ENTER to select all (or type indices e.g. 1,2): "..reset)
+            local sel = io.read()
+            config.packages = {}
+            if sel == "" then
+                for _, p in ipairs(scanned) do table.insert(config.packages, p) end
+            else
+                for str in string.gmatch(sel, "([^,]+)") do
+                    local n = tonumber(str)
+                    if n and scanned[n] then table.insert(config.packages, scanned[n]) end
+                end
+            end
+            print(green.."Selected "..#config.packages.." packages."..reset)
+        end
+
+        if #config.packages > 0 then
+            -- 2. Private Server
+            border()
+            io.write(yellow.."Use same private server URL for all packages? (y/n): "..reset)
+            local same_ps = io.read():lower()
+            
+            if same_ps == "n" then
+                config.private_servers.mode = "per_package"
+                config.private_servers.url = ""
+                config.private_servers.urls = {}
+                print(yellow.."Enter URL for each package:"..reset)
+                for _, pkg in ipairs(config.packages) do
+                    io.write("  "..pkg..": ")
+                    local u = io.read()
+                    config.private_servers.urls[pkg] = u
+                end
+            else
+                config.private_servers.mode = "same"
+                io.write(yellow.."Enter Private Server URL: "..reset)
+                config.private_servers.url = io.read()
+                config.private_servers.urls = {}
+            end
+
+            -- 3. Mask Username
+            border()
+            io.write(yellow.."Mask username in status table (e.g. DIVxxxNE)? (y/n): "..reset)
+            config.mask_username = (io.read():lower() == "y")
+
+            -- 4. Delay Launch
+            border()
+            io.write(yellow.."Delay Launch (seconds) [ENTER=0]: "..reset)
+            config.delay_launch = tonumber(io.read()) or 0
+
+            -- 5. Webhook
+            border()
+            io.write(yellow.."Webhook URL (Critical Alerts) [ENTER to skip]: "..reset)
+            local wh_url = io.read()
+            
+            if wh_url and wh_url ~= "" then
+                config.webhook.enabled = true
+                config.webhook.url = wh_url
+                
+                print(yellow.."Webhook Mode:"..reset)
+                print("  [1] Send New Message (Default)")
+                print("  [2] Edit Previous Message")
+                print("  [3] Disable Status Updates")
+                io.write(yellow.."Select (1-3): "..reset)
+                local wh_mode = io.read()
+                if wh_mode == "2" then config.webhook.mode = "edit"
+                elseif wh_mode == "3" then config.webhook.mode = "disabled_status"
+                else config.webhook.mode = "new" end
+                
+                io.write(yellow.."Tag @everyone? (y/n): "..reset)
+                config.webhook.tag_everyone = (io.read():lower() == "y")
+                
+                io.write(yellow.."Status Update Interval (min 5 mins, 0/Enter = Off): "..reset)
+                local wh_int = tonumber(io.read()) or 0
+                if wh_int > 0 and wh_int < 5 then wh_int = 5 end
+                config.webhook.interval = wh_int
+            else
+                config.webhook.enabled = false
+            end
+
+            -- 6. Relaunch Loop
+            border()
+            io.write(yellow.."Relaunch Loop Delay (minutes) [ENTER=0]: "..reset)
+            config.delay_relaunch = tonumber(io.read()) or 0
+
+            -- Save
+            saveConfig(config)
+            print(green.."\nConfiguration saved successfully!"..reset)
+        end
 
     elseif pilih == "3" then
         configMenu()
