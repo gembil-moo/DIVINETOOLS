@@ -74,6 +74,10 @@ local function getUsername(pkg)
     handle:close()
     
     local user = content and content:match('name="username">([^<]+)<') or nil
+    if user then
+        user = user:gsub("[\r\n]", "") -- Hapus newline agar tidak merusak UI
+        user = user:gsub("%s+", "")    -- Hapus spasi berlebih
+    end
     return user
 end
 
