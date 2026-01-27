@@ -2,15 +2,34 @@
 
 echo "[*] Setting up DIVINETOOLS environment..."
 
-# Setup storage permission
+# Termux storage
 termux-setup-storage
 
-# Update & Install System Packages
+# Update system
 pkg update -y && pkg upgrade -y
-pkg install -y lua53 tsu python figlet toilet ncurses-utils android-tools lua-cjson
 
-# Install Python Libraries
+# Install system packages
+pkg install -y \
+lua53 \
+luarocks \
+python \
+tsu \
+figlet \
+toilet \
+ncurses-utils \
+android-tools
+
+# Install Lua modules
+echo "[*] Installing Lua modules..."
+luarocks install lua-cjson
+luarocks install luasocket
+
+# Install Python libraries
+echo "[*] Installing Python packages..."
 pip install -r requirements.txt
 
+# Permission
 chmod +x run.sh
-echo "[+] Installation complete! Run ./run.sh to start."
+
+echo "[+] Installation complete!"
+echo "[+] Run with: ./run.sh"
