@@ -82,6 +82,44 @@ local function maskString(str)
     return str:sub(1, 3) .. "xxx" .. str:sub(-2)
 end
 
+-- ===== EXECUTOR HELPER =====
+local function getExecutorFolders()
+    local targets = {}
+    local delta_dir = "/storage/emulated/0/Delta/Autoexecute"
+    local fluxus_dir = "/storage/emulated/0/FluxusZ/autoexec"
+    
+    local function exists(path)
+        local h = io.popen("ls -d " .. path .. " 2>/dev/null")
+        local res = h:read("*a")
+        h:close()
+        return res and res ~= ""
+    end
+
+    if exists("/storage/emulated/0/Delta") then table.insert(targets, delta_dir) end
+    if exists("/storage/emulated/0/FluxusZ") then table.insert(targets, fluxus_dir) end
+    if #targets == 0 then table.insert(targets, delta_dir) end -- Default to Delta
+    
+    return targets
+end
+
+local function installDivineMonitor(config)
+    local targets = getExecutorFolders()
+    for _, dir in ipairs(targets) do
+        os.execute("mkdir -p " .. dir)
+        
+        local cfg_content = "-- Divine Monitor Config\n"
+        cfg_content = cfg_content .. 'getgenv().DVN_WEBHOOK_URL = "' .. (config.webhook.url or "") .. '"\n'
+        cfg_content = cfg_content .. 'getgenv().DVN_MENTION_EVERYONE = ' .. tostring(config.webhook.tag_everyone or false) .. '\n'
+        
+        local f_cfg = io.open(dir .. "/00_DivineConfig.txt", "w")
+        if f_cfg then f_cfg:write(cfg_content) f_cfg:close() end
+
+        local loader_content = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/gembil-moo/DIVINETOOLS/refs/heads/main/Divine.lua"))()'
+        local f_load = io.open(dir .. "/01_DivineMonitor.txt", "w")
+        if f_load then f_load:write(loader_content) f_load:close() end
+    end
+end
+
 -- ===== SUB MENU CONFIG (UPDATED) =====
 local function configMenu()
     while true do
@@ -352,6 +390,7 @@ local function configMenu()
                 config.webhook.tag_everyone = (tag == "y")
 
                 saveConfig(config)
+                installDivineMonitor(config) -- Update script config when webhook changes
                 print(green.."\nWebhook configuration saved!"..reset)
             else
                 print(red.."\nInvalid option. No changes made."..reset)
@@ -596,22 +635,7 @@ while true do
                         local content = table.concat(lines, "\n")
 
                         -- Detect Executor Folders
-                        local targets = {}
-                        local delta_dir = "/storage/emulated/0/Delta/Autoexecute"
-                        local fluxus_dir = "/storage/emulated/0/FluxusZ/autoexec"
-                        
-                        -- Helper to check directory existence
-                        local function exists(path)
-                            local h = io.popen("ls -d " .. path .. " 2>/dev/null")
-                            local res = h:read("*a")
-                            h:close()
-                            return res and res ~= ""
-                        end
-
-                        if exists("/storage/emulated/0/Delta") then table.insert(targets, delta_dir) end
-                        if exists("/storage/emulated/0/FluxusZ") then table.insert(targets, fluxus_dir) end
-                        if #targets == 0 then table.insert(targets, delta_dir) end -- Default to Delta if none found
-
+                        local targets = getExecutorFolders()
                         for _, dir in ipairs(targets) do
                             os.execute("mkdir -p " .. dir)
                             local f = io.open(dir .. "/script_" .. script_num .. ".txt", "w")
@@ -621,6 +645,10 @@ while true do
                         script_num = script_num + 1
                     end
                 end
+
+                -- 8. Install Divine Monitor (Mandatory)
+                print(green.."\n[*] Installing Divine Monitor (Mandatory)..."..reset)
+                installDivineMonitor(config)
 
                 -- Save
                 saveConfig(config)
