@@ -464,156 +464,168 @@ while true do
 
         local config = loadConfig()
 
-        -- 1. Auto Detect Packages
-        print(green.."[*] Scanning for com.roblox packages..."..reset)
-        local handle = io.popen("pm list packages | grep com.roblox")
-        local result = handle:read("*a")
-        handle:close()
-
-        local scanned = {}
-        for line in result:gmatch("[^\r\n]+") do
-            local p = line:match("package:(.*)")
-            if p then table.insert(scanned, p) end
-        end
-
-        if #scanned == 0 then
-            print(red.."No packages found! Install Roblox first."..reset)
-        else
-            print(yellow.."Found "..#scanned.." packages:"..reset)
-            for i, p in ipairs(scanned) do print("  ["..i.."] "..p) end
-            
-            io.write(yellow.."\nPress ENTER to select all (or type indices e.g. 1,2): "..reset)
-            local sel = io.read()
-            config.packages = {}
-            if sel == "" then
-                for _, p in ipairs(scanned) do table.insert(config.packages, p) end
-            else
-                for str in string.gmatch(sel, "([^,]+)") do
-                    local n = tonumber(str)
-                    if n and scanned[n] then table.insert(config.packages, scanned[n]) end
-                end
-            end
-            print(green.."Selected "..#config.packages.." packages."..reset)
-        end
-
+        local proceed = true
         if #config.packages > 0 then
-            -- 2. Private Server
-            border()
-            io.write(yellow.."Use same private server URL for all packages? (y/n): "..reset)
-            local same_ps = io.read():lower()
-            
-            if same_ps == "n" then
-                config.private_servers.mode = "per_package"
-                config.private_servers.url = ""
-                config.private_servers.urls = {}
-                print(yellow.."Enter URL for each package:"..reset)
-                for _, pkg in ipairs(config.packages) do
-                    io.write("  "..pkg..": ")
-                    local u = io.read()
-                    config.private_servers.urls[pkg] = u
+            print(yellow.."Existing configuration found ("..#config.packages.." packages)."..reset)
+            io.write(red.."Overwrite? (y/n): "..reset)
+            if io.read():lower() ~= "y" then
+                proceed = false
+                print(red.."\nCancelled."..reset)
+            end
+        end
+
+        if proceed then
+            -- 1. Auto Detect Packages
+            print(green.."[*] Scanning for com.roblox packages..."..reset)
+            local handle = io.popen("pm list packages | grep com.roblox")
+            local result = handle:read("*a")
+            handle:close()
+
+            local scanned = {}
+            for line in result:gmatch("[^\r\n]+") do
+                local p = line:match("package:(.*)")
+                if p then table.insert(scanned, p) end
+            end
+
+            if #scanned == 0 then
+                print(red.."No packages found! Install Roblox first."..reset)
+            else
+                print(yellow.."Found "..#scanned.." packages:"..reset)
+                for i, p in ipairs(scanned) do print("  ["..i.."] "..p) end
+                
+                io.write(yellow.."\nPress ENTER to select all (or type indices e.g. 1,2): "..reset)
+                local sel = io.read()
+                config.packages = {}
+                if sel == "" then
+                    for _, p in ipairs(scanned) do table.insert(config.packages, p) end
+                else
+                    for str in string.gmatch(sel, "([^,]+)") do
+                        local n = tonumber(str)
+                        if n and scanned[n] then table.insert(config.packages, scanned[n]) end
+                    end
                 end
-            else
-                config.private_servers.mode = "same"
-                io.write(yellow.."Enter Private Server URL: "..reset)
-                config.private_servers.url = io.read()
-                config.private_servers.urls = {}
+                print(green.."Selected "..#config.packages.." packages."..reset)
             end
 
-            -- 3. Mask Username
-            border()
-            io.write(yellow.."Mask username in status table (e.g. DIVxxxNE)? (y/n): "..reset)
-            config.mask_username = (io.read():lower() == "y")
-
-            -- 4. Delay Launch
-            border()
-            io.write(yellow.."Delay Launch (seconds) [ENTER=0]: "..reset)
-            config.delay_launch = tonumber(io.read()) or 0
-
-            -- 5. Webhook
-            border()
-            io.write(yellow.."Webhook URL (Critical Alerts) [ENTER to skip]: "..reset)
-            local wh_url = io.read()
-            
-            if wh_url and wh_url ~= "" then
-                config.webhook.enabled = true
-                config.webhook.url = wh_url
+            if #config.packages > 0 then
+                -- 2. Private Server
+                border()
+                io.write(yellow.."Use same private server URL for all packages? (y/n): "..reset)
+                local same_ps = io.read():lower()
                 
-                print(yellow.."Webhook Mode:"..reset)
-                print("  [1] Send New Message (Default)")
-                print("  [2] Edit Previous Message")
-                print("  [3] Disable Status Updates")
-                io.write(yellow.."Select (1-3): "..reset)
-                local wh_mode = io.read()
-                if wh_mode == "2" then config.webhook.mode = "edit"
-                elseif wh_mode == "3" then config.webhook.mode = "disabled_status"
-                else config.webhook.mode = "new" end
+                if same_ps == "n" then
+                    config.private_servers.mode = "per_package"
+                    config.private_servers.url = ""
+                    config.private_servers.urls = {}
+                    print(yellow.."Enter URL for each package:"..reset)
+                    for _, pkg in ipairs(config.packages) do
+                        io.write("  "..pkg..": ")
+                        local u = io.read()
+                        config.private_servers.urls[pkg] = u
+                    end
+                else
+                    config.private_servers.mode = "same"
+                    io.write(yellow.."Enter Private Server URL: "..reset)
+                    config.private_servers.url = io.read()
+                    config.private_servers.urls = {}
+                end
+
+                -- 3. Mask Username
+                border()
+                io.write(yellow.."Mask username in status table (e.g. DIVxxxNE)? (y/n): "..reset)
+                config.mask_username = (io.read():lower() == "y")
+
+                -- 4. Delay Launch
+                border()
+                io.write(yellow.."Delay Launch (seconds) [ENTER=0]: "..reset)
+                config.delay_launch = tonumber(io.read()) or 0
+
+                -- 5. Webhook
+                border()
+                io.write(yellow.."Webhook URL (Critical Alerts) [ENTER to skip]: "..reset)
+                local wh_url = io.read()
                 
-                io.write(yellow.."Tag @everyone? (y/n): "..reset)
-                config.webhook.tag_everyone = (io.read():lower() == "y")
-                
-                io.write(yellow.."Status Update Interval (min 5 mins, 0/Enter = Off): "..reset)
-                local wh_int = tonumber(io.read()) or 0
-                if wh_int > 0 and wh_int < 5 then wh_int = 5 end
-                config.webhook.interval = wh_int
-            else
-                config.webhook.enabled = false
-            end
-
-            -- 6. Relaunch Loop
-            border()
-            io.write(yellow.."Relaunch Loop Delay (minutes) [ENTER=0]: "..reset)
-            config.delay_relaunch = tonumber(io.read()) or 0
-
-            -- 7. Auto Execute Script Injection
-            border()
-            io.write(yellow.."Inject auto exe script? (y/n): "..reset)
-            if io.read():lower() == "y" then
-                local script_num = 1
-                while true do
-                    io.write(yellow.."\nInject script "..script_num.."? (y/n): "..reset)
-                    if io.read():lower() ~= "y" then break end
-
-                    print(green.."Enter script content (loadstring etc).")
-                    print(yellow.."Type 'END' on a new line to finish:"..reset)
+                if wh_url and wh_url ~= "" then
+                    config.webhook.enabled = true
+                    config.webhook.url = wh_url
                     
-                    local lines = {}
+                    print(yellow.."Webhook Mode:"..reset)
+                    print("  [1] Send New Message (Default)")
+                    print("  [2] Edit Previous Message")
+                    print("  [3] Disable Status Updates")
+                    io.write(yellow.."Select (1-3): "..reset)
+                    local wh_mode = io.read()
+                    if wh_mode == "2" then config.webhook.mode = "edit"
+                    elseif wh_mode == "3" then config.webhook.mode = "disabled_status"
+                    else config.webhook.mode = "new" end
+                    
+                    io.write(yellow.."Tag @everyone? (y/n): "..reset)
+                    config.webhook.tag_everyone = (io.read():lower() == "y")
+                    
+                    io.write(yellow.."Status Update Interval (min 5 mins, 0/Enter = Off): "..reset)
+                    local wh_int = tonumber(io.read()) or 0
+                    if wh_int > 0 and wh_int < 5 then wh_int = 5 end
+                    config.webhook.interval = wh_int
+                else
+                    config.webhook.enabled = false
+                end
+
+                -- 6. Relaunch Loop
+                border()
+                io.write(yellow.."Relaunch Loop Delay (minutes) [ENTER=0]: "..reset)
+                config.delay_relaunch = tonumber(io.read()) or 0
+
+                -- 7. Auto Execute Script Injection
+                border()
+                io.write(yellow.."Inject auto exe script? (y/n): "..reset)
+                if io.read():lower() == "y" then
+                    local script_num = 1
                     while true do
-                        local line = io.read()
-                        if line == "END" then break end
-                        table.insert(lines, line)
-                    end
-                    local content = table.concat(lines, "\n")
+                        io.write(yellow.."\nInject script "..script_num.."? (y/n): "..reset)
+                        if io.read():lower() ~= "y" then break end
 
-                    -- Detect Executor Folders
-                    local targets = {}
-                    local delta_dir = "/storage/emulated/0/Delta/Autoexecute"
-                    local fluxus_dir = "/storage/emulated/0/FluxusZ/autoexec"
-                    
-                    -- Helper to check directory existence
-                    local function exists(path)
-                        local h = io.popen("ls -d " .. path .. " 2>/dev/null")
-                        local res = h:read("*a")
-                        h:close()
-                        return res and res ~= ""
-                    end
+                        print(green.."Enter script content (loadstring etc).")
+                        print(yellow.."Type 'END' on a new line to finish:"..reset)
+                        
+                        local lines = {}
+                        while true do
+                            local line = io.read()
+                            if line == "END" then break end
+                            table.insert(lines, line)
+                        end
+                        local content = table.concat(lines, "\n")
 
-                    if exists("/storage/emulated/0/Delta") then table.insert(targets, delta_dir) end
-                    if exists("/storage/emulated/0/FluxusZ") then table.insert(targets, fluxus_dir) end
-                    if #targets == 0 then table.insert(targets, delta_dir) end -- Default to Delta if none found
+                        -- Detect Executor Folders
+                        local targets = {}
+                        local delta_dir = "/storage/emulated/0/Delta/Autoexecute"
+                        local fluxus_dir = "/storage/emulated/0/FluxusZ/autoexec"
+                        
+                        -- Helper to check directory existence
+                        local function exists(path)
+                            local h = io.popen("ls -d " .. path .. " 2>/dev/null")
+                            local res = h:read("*a")
+                            h:close()
+                            return res and res ~= ""
+                        end
 
-                    for _, dir in ipairs(targets) do
-                        os.execute("mkdir -p " .. dir)
-                        local f = io.open(dir .. "/script_" .. script_num .. ".txt", "w")
-                        if f then f:write(content) f:close() end
+                        if exists("/storage/emulated/0/Delta") then table.insert(targets, delta_dir) end
+                        if exists("/storage/emulated/0/FluxusZ") then table.insert(targets, fluxus_dir) end
+                        if #targets == 0 then table.insert(targets, delta_dir) end -- Default to Delta if none found
+
+                        for _, dir in ipairs(targets) do
+                            os.execute("mkdir -p " .. dir)
+                            local f = io.open(dir .. "/script_" .. script_num .. ".txt", "w")
+                            if f then f:write(content) f:close() end
+                        end
+                        print(green.."Script saved to auto-execute folder(s)."..reset)
+                        script_num = script_num + 1
                     end
-                    print(green.."Script saved to auto-execute folder(s)."..reset)
-                    script_num = script_num + 1
                 end
-            end
 
-            -- Save
-            saveConfig(config)
-            print(green.."\nConfiguration saved successfully!"..reset)
+                -- Save
+                saveConfig(config)
+                print(green.."\nConfiguration saved successfully!"..reset)
+            end
         end
 
     elseif pilih == "3" then
