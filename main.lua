@@ -120,6 +120,33 @@ local function installDivineMonitor(config)
     end
 end
 
+-- Fungsi Kirim Webhook via Termux (CURL)
+local function SendWebhook(reason)
+    local cfg = loadConfig()
+    if not cfg.webhook.url or cfg.webhook.url == "" then return end
+
+    -- Sanitize reason untuk mencegah error JSON
+    reason = string.gsub(tostring(reason), '"', '\\"')
+
+    local msg = {
+        username = "DVN Manager",
+        content = (cfg.webhook.tag_everyone and "@everyone " or "") .. "⚠️ **STATUS ALERT!**",
+        embeds = {{
+            title = "Action Required",
+            description = "Reason: " .. reason,
+            color = 16711680, -- Merah
+            footer = { text = "Sent from Divine Termux Tool" }
+        }}
+    }
+    
+    -- Convert table ke JSON string (menggunakan cjson yang sudah ada agar lebih aman)
+    local json_body = cjson.encode(msg)
+
+    -- Eksekusi CURL diam-diam
+    local cmd = "curl -H \"Content-Type: application/json\" -d '"..json_body.."' \""..cfg.webhook.url.."\" > /dev/null 2>&1"
+    os.execute(cmd)
+end
+
 local function CalculateBounds(index, total_pkg, screenW, screenH)
     -- === CONFIGURASI GRID PINTAR ===
     local cols, rows
@@ -166,6 +193,45 @@ local function CalculateBounds(index, total_pkg, screenW, screenH)
     local y2 = y1 + h
 
     return string.format("%d,%d,%d,%d", x1, y1, x2, y2)
+end
+
+local function GetSystemMemory()
+    local handle = io.popen("free -m | awk '/Mem:/ {print $3 \" / \" $2 \" MB\"}'")
+    if not handle then return "N/A" end
+    local result = handle:read("*a")
+    handle:close()
+    return result and result:gsub("\n", "") or "N/A"
+end
+
+local function DrawDashboard(statuses, config)
+    os.execute("clear")
+    print(iceblue.."╔══════════════════════════════════════════════════╗"..reset)
+    print(iceblue.."║           🚀 DIVINE MONITOR DASHBOARD 🚀         ║"..reset)
+    print(iceblue.."╠══════════════════════════════════════════════════╣"..reset)
+    print(iceblue.."║"..yellow.." MEMORY: "..reset..string.format("%-36s", GetSystemMemory())..iceblue.."║"..reset)
+    print(iceblue.."║"..yellow.." TIME  : "..reset..string.format("%-36s", os.date("%H:%M:%S"))..iceblue.."║"..reset)
+    print(iceblue.."╠══════════════════════════════════════════════════╣"..reset)
+    print(iceblue.."║ NO  | PACKAGE                   | STATUS         ║"..reset)
+    print(iceblue.."╠══════════════════════════════════════════════════╣"..reset)
+    
+    for i, pkg in ipairs(config.packages) do
+        local s = statuses[pkg] or "IDLE"
+        local color = reset
+        if s == "ONLINE" then color = green
+        elseif s == "LAUNCHING" then color = iceblue
+        elseif s == "RESETTING" then color = red
+        elseif s:find("WAITING") then color = yellow
+        elseif s == "OPTIMIZING" then color = "\27[35m"
+        end
+        
+        local user = getUsername(pkg)
+        local display_name = user and (config.mask_username and maskString(user) or user) or pkg
+        if #display_name > 23 then display_name = display_name:sub(1, 20).."..." end
+        
+        print(iceblue.."║"..reset..string.format(" %-3d | %-25s | %s%-14s", i, display_name, color, s)..iceblue.." ║"..reset)
+    end
+    print(iceblue.."╚══════════════════════════════════════════════════╝"..reset)
+    print(iceblue.." [CTRL+C] to Stop Monitor"..reset)
 end
 
 -- ===== SUB MENU CONFIG (UPDATED) =====
@@ -513,6 +579,55 @@ local function configMenu()
     end
 end
 
+local function OptimizeSystem()
+    os.execute("clear")
+    border()
+    print(green.."🚀 DIVINE OPTIMIZER (GOD MODE)"..reset)
+    print(" [1] Clear Cache & RAM")
+    print(" [2] Low Resolution (540p)")
+    print(" [3] GOD MODE (Hapus Texture + No Anim)")
+    print(" [4] Reset Normal")
+    print(" [5] Back")
+    
+    io.write(yellow.."\nSelect: "..reset)
+    local l = io.read()
+
+    if l == "1" then
+        os.execute("pm trim-caches 128G")
+        os.execute("am kill-all")
+        print(green.."Done."..reset)
+    elseif l == "2" then
+        os.execute("wm size 540x960")
+        os.execute("wm density 240")
+        print(green.."Resolution lowered."..reset)
+    elseif l == "3" then
+        print(red.."🔥 ACTIVATING GOD MODE..."..reset)
+        os.execute("settings put global window_animation_scale 0")
+        os.execute("settings put global transition_animation_scale 0")
+        
+        local cfg = loadConfig()
+        local paths = {"/files/content/textures", "/files/content/sky", "/files/content/particles", "/files/content/sounds"}
+        local targets = (#cfg.packages > 0) and cfg.packages or {"com.roblox.client"}
+        
+        for _, pkg in ipairs(targets) do
+            for _, sub in ipairs(paths) do
+                local p = "/data/data/"..pkg..sub
+                os.execute("rm -rf "..p)
+                os.execute("touch "..p)
+                os.execute("chmod 444 "..p)
+            end
+            print(yellow.."-> Optimized: "..pkg..reset)
+        end
+        print(iceblue.."✅ GOD MODE ACTIVE!"..reset)
+        io.read()
+    elseif l == "4" then
+        os.execute("wm size reset")
+        os.execute("wm density reset")
+        os.execute("settings put global window_animation_scale 1")
+        print(green.."Reset done."..reset)
+    end
+end
+
 
 -- ===== MAIN MENU =====
 local function showMain()
@@ -542,7 +657,115 @@ while true do
     os.execute("clear")
 
     if pilih == "1" then
-        print(green.."Starting application..."..reset)
+        local config = loadConfig()
+        if #config.packages == 0 then
+            print(red.."No packages configured! Go to First Configuration."..reset)
+            io.read()
+        else
+            -- Get Screen Resolution
+            local sw, sh = 1080, 2400 -- Default
+            local h_wm = io.popen("wm size")
+            if h_wm then
+                local res = h_wm:read("*a")
+                h_wm:close()
+                if res then
+                    local w, h = res:match("Physical size: (%d+)x(%d+)")
+                    if w and h then sw, sh = tonumber(w), tonumber(h) end
+                end
+            end
+
+            -- Initialize Status
+            local statuses = {}
+            for _, pkg in ipairs(config.packages) do statuses[pkg] = "IDLE" end
+            
+            -- Main Loop
+            while true do
+                -- === PHASE 1: OPTIMIZING (REAL ACTION: TEXTURE NUKE) ===
+                for _, pkg in ipairs(config.packages) do
+                    statuses[pkg] = "OPTIMIZING"
+                    DrawDashboard(statuses, config)
+                    
+                    -- Force stop & Nuke Textures
+                    os.execute("am force-stop "..pkg.." >/dev/null 2>&1")
+                    
+                    local paths = {"/files/content/textures", "/files/content/sky"}
+                    for _, sub in ipairs(paths) do
+                         local full = "/data/data/"..pkg..sub
+                         os.execute("rm -rf "..full)
+                         os.execute("touch "..full)
+                         os.execute("chmod 444 "..full)
+                    end
+                    
+                    -- Bersihkan Cache
+                    os.execute("pm trim-caches 128G")
+                    os.execute("sleep 0.2")
+                end
+
+                -- 2. Launching
+                for i, pkg in ipairs(config.packages) do
+                    statuses[pkg] = "LAUNCHING"
+                    DrawDashboard(statuses, config)
+                    
+                    local bounds = CalculateBounds(i, #config.packages, sw, sh)
+                    local ps_url = (config.private_servers.mode == "same") and config.private_servers.url or config.private_servers.urls[pkg]
+                    
+                    local cmd = "am start -n "..pkg.."/com.roblox.client.ActivityProtocolLaunch --windowingMode 5 --bounds "..bounds
+                    if ps_url and ps_url ~= "" then
+                        cmd = cmd .. " -a android.intent.action.VIEW -d \""..ps_url.."\""
+                    end
+                    
+                    os.execute(cmd .. " >/dev/null 2>&1")
+                    
+                    if config.delay_launch > 0 then
+                        for d = config.delay_launch, 1, -1 do
+                            statuses[pkg] = "WAITING ("..d.."s)"
+                            DrawDashboard(statuses, config)
+                            os.execute("sleep 1")
+                        end
+                    end
+                    
+                    statuses[pkg] = "ONLINE"
+                    DrawDashboard(statuses, config)
+                end
+
+                -- 3. Keep-Alive / Monitor Phase
+                local loop_delay = (config.delay_relaunch > 0) and (config.delay_relaunch * 60) or 0
+                
+                -- Helper untuk cek sinyal restart dari Divine.lua
+                local function checkSignal()
+                    local paths = {
+                        "/storage/emulated/0/Delta/Workspace/divine_relaunch.req",
+                        "/storage/emulated/0/FluxusZ/workspace/divine_relaunch.req"
+                    }
+                    for _, sig in ipairs(paths) do
+                        local f = io.open(sig, "r")
+                        if f then
+                            local reason = f:read("*a")
+                            f:close()
+                            os.execute("rm "..sig)
+                            SendWebhook(reason)
+                            return true -- Sinyal ditemukan, minta restart
+                        end
+                    end
+                    return false
+                end
+
+                if loop_delay > 0 then
+                    local start_time = os.time()
+                    while (os.time() - start_time) < loop_delay do
+                        DrawDashboard(statuses, config)
+                        if checkSignal() then break end -- Break loop untuk restart
+                        os.execute("sleep 1")
+                    end
+                else
+                    while true do
+                        DrawDashboard(statuses, config)
+                        if checkSignal() then break end -- Break loop untuk restart
+                        os.execute("sleep 5")
+                    end
+                end
+            end
+        end
 
     elseif pilih == "2" then
         border()
@@ -708,7 +931,7 @@ while true do
         configMenu()
 
     elseif pilih == "4" then
-        print(green.."Optimizing device..."..reset)
+        OptimizeSystem()
 
     elseif pilih == "5" then
         print(red.."Uninstalling components..."..reset)
