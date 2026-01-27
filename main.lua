@@ -49,6 +49,8 @@ local function loadConfig()
     if not config.webhook then
         config.webhook = { enabled = false, url = "", mode = "new", interval = 5, tag_everyone = false }
     end
+    if not config.delay_launch then config.delay_launch = 0 end
+    if not config.delay_relaunch then config.delay_relaunch = 0 end
     return config
 end
 
@@ -64,12 +66,13 @@ local function saveConfig(config)
 end
 
 local function getUsername(pkg)
-    local handle = io.popen("su -c 'cat /data/data/" .. pkg .. "/shared_prefs/prefs.xml 2>/dev/null'")
+    -- Redirect stderr ke /dev/null agar error tidak muncul di layar
+    local handle = io.popen("su -c 'cat /data/data/" .. pkg .. "/shared_prefs/prefs.xml 2>/dev/null' 2>/dev/null")
     if not handle then return nil end
     local content = handle:read("*a")
     handle:close()
     
-    local user = content:match('name="username">([^<]+)<')
+    local user = content and content:match('name="username">([^<]+)<') or nil
     return user
 end
 
@@ -347,10 +350,36 @@ local function configMenu()
             end
 
         elseif c == "5" then
-            print(green.."Setting Delay Launch..."..reset)
+            border()
+            print("        "..green.."✦ DELAY LAUNCH CONFIG ✦"..reset)
+            border()
+            local config = loadConfig()
+            print(yellow.."Current Delay: "..reset .. (config.delay_launch > 0 and (config.delay_launch.." seconds") or "Off (0s)"))
+            border()
+            
+            io.write(yellow.."Enter delay in seconds (ENTER for 0/Off): "..reset)
+            local input = io.read()
+            local delay = tonumber(input) or 0
+            
+            config.delay_launch = delay
+            saveConfig(config)
+            print(green.."\nDelay Launch set to "..delay.." seconds."..reset)
 
         elseif c == "6" then
-            print(green.."Setting Relaunch Loop Delay..."..reset)
+            border()
+            print("        "..green.."✦ RELAUNCH LOOP CONFIG ✦"..reset)
+            border()
+            local config = loadConfig()
+            print(yellow.."Current Delay: "..reset .. (config.delay_relaunch > 0 and (config.delay_relaunch.." minutes") or "Off (0m)"))
+            border()
+            
+            io.write(yellow.."Enter delay in minutes (ENTER for 0/Off): "..reset)
+            local input = io.read()
+            local delay = tonumber(input) or 0
+            
+            config.delay_relaunch = delay
+            saveConfig(config)
+            print(green.."\nRelaunch Loop Delay set to "..delay.." minutes."..reset)
 
         elseif c == "7" then
             break
