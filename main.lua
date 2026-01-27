@@ -96,10 +96,11 @@ local function configMenu()
         print("  [4] Webhook")
         print("  [5] Delay Launch")
         print("  [6] Delay Relaunch Loop")
-        print("  [7] Back to Main Menu")
+        print("  [7] Mask Username Toggle")
+        print("  [8] Back to Main Menu")
 
         border()
-        io.write(yellow.."Select option (1-7): "..reset)
+        io.write(yellow.."Select option (1-8): "..reset)
         local c = io.read()
 
         os.execute("clear")
@@ -389,6 +390,29 @@ local function configMenu()
             print(green.."\nRelaunch Loop Delay set to "..delay.." minutes."..reset)
 
         elseif c == "7" then
+            border()
+            print("        "..green.."✦ MASK USERNAME CONFIG ✦"..reset)
+            border()
+            local config = loadConfig()
+            print(yellow.."Current Status: "..reset .. (config.mask_username and (green.."Enabled"..reset) or (red.."Disabled"..reset)))
+            border()
+            
+            io.write(yellow.."Enable username masking? (y/n): "..reset)
+            local choice = io.read():lower()
+            
+            if choice == "y" then
+                config.mask_username = true
+                saveConfig(config)
+                print(green.."\nUsername masking enabled."..reset)
+            elseif choice == "n" then
+                config.mask_username = false
+                saveConfig(config)
+                print(red.."\nUsername masking disabled."..reset)
+            else
+                print(red.."\nInvalid option. No changes made."..reset)
+            end
+
+        elseif c == "8" then
             break
 
         else
