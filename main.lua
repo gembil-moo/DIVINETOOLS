@@ -116,7 +116,7 @@ local function showProgress(title, current, total)
     end
 end
 
-local function displayFullConfig(config)
+local function displayFullConfig(config, cached_users)
     border()
     print("        "..green.."✦ CURRENT CONFIGURATION ✦"..reset)
     border()
@@ -126,13 +126,16 @@ local function displayFullConfig(config)
     if #config.packages == 0 then
         print(red.."  No packages configured."..reset)
     else
-        local cached_users = {}
-        for i, pkg in ipairs(config.packages) do
-            showProgress(yellow.."Checking users"..reset, i, #config.packages)
-            cached_users[pkg] = getUsername(pkg)
+        if not cached_users then
+            cached_users = {}
+            for i, pkg in ipairs(config.packages) do
+                showProgress(yellow.."Checking users"..reset, i, #config.packages)
+                cached_users[pkg] = getUsername(pkg)
+            end
+            os.execute("clear") -- Clear progress bar and redraw
+            displayFullConfig(config, cached_users) -- Redraw with cached data
+            return
         end
-        os.execute("clear") -- Clear progress bar and redraw
-        displayFullConfig(config, cached_users) -- Redraw with cached data
 
         for i, pkg in ipairs(config.packages) do
             local user = cached_users[pkg]
