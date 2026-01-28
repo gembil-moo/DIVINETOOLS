@@ -26,6 +26,8 @@ local function printBanner()
     for _, line in ipairs(divine) do
         print(iceblue .. line .. reset)
     end
+    print(yellow .. "    Your Monitoring Assistant" .. reset)
+    print(green .. "             v0.0.1 (beta)" .. reset)
 end
 
 -- ===== CONFIG HELPER (JSON FORMAT) =====
