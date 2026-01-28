@@ -101,6 +101,21 @@ local function maskString(str)
     return str:sub(1, 3) .. "xxx" .. str:sub(-2)
 end
 
+local function showProgress(title, current, total)
+    local percentage = math.floor((current / total) * 100)
+    local bar_length = 20
+    local filled_length = math.floor(bar_length * percentage / 100)
+    local bar = string.rep("█", filled_length) .. string.rep("─", bar_length - filled_length)
+    
+    -- \r moves cursor to the beginning of the line
+    io.write(string.format("\r%s [%s] %d%% (%d/%d)", title, bar, percentage, current, total))
+    io.flush()
+
+    if current == total then
+        print() -- Newline when done
+    end
+end
+
 local function displayFullConfig(config)
     border()
     print("        "..green.."✦ CURRENT CONFIGURATION ✦"..reset)
@@ -111,8 +126,16 @@ local function displayFullConfig(config)
     if #config.packages == 0 then
         print(red.."  No packages configured."..reset)
     else
+        local cached_users = {}
         for i, pkg in ipairs(config.packages) do
-            local user = getUsername(pkg)
+            showProgress(yellow.."Checking users"..reset, i, #config.packages)
+            cached_users[pkg] = getUsername(pkg)
+        end
+        os.execute("clear") -- Clear progress bar and redraw
+        displayFullConfig(config, cached_users) -- Redraw with cached data
+
+        for i, pkg in ipairs(config.packages) do
+            local user = cached_users[pkg]
             local display_user = user and (config.mask_username and maskString(user) or user) or "N/A"
             
             local url = "None"
@@ -316,8 +339,15 @@ local function configMenu()
                 if #cfg.packages == 0 then
                     print(red.."  No packages saved."..reset)
                 else
+                    local cached_users = {}
                     for i, pkg in ipairs(cfg.packages) do
-                        local user = getUsername(pkg)
+                        showProgress(yellow.."Checking users"..reset, i, #cfg.packages)
+                        cached_users[pkg] = getUsername(pkg)
+                    end
+                    os.execute("clear")
+
+                    for i, pkg in ipairs(cfg.packages) do
+                        local user = cached_users[pkg]
                         local display_user = (user and cfg.mask_username) and maskString(user) or user
                         local status = user and (green .. " (" .. display_user .. ")" .. reset) or (red .. " (Not Logged In)" .. reset)
                         print("  ["..i.."] " .. pkg .. status)
@@ -609,7 +639,8 @@ local function configMenu()
             end
 
         elseif c == "8" then
-            displayFullConfig(loadConfig())
+            -- Pass nil for cache, so it knows to generate it
+            displayFullConfig(loadConfig(), nil)
 
         elseif c == "9" then
             break
