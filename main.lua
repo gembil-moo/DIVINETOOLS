@@ -39,6 +39,13 @@ local function loadConfig()
         file:close()
         local success, result = pcall(cjson.decode, content)
         if success then config = result end
+
+        -- Bersihkan nama paket dari spasi/newline yang menyebabkan tampilan berantakan
+        if config.packages then
+            for i, pkg in ipairs(config.packages) do
+                config.packages[i] = pkg:gsub("%s+", "")
+            end
+        end
     end
 
     -- Set default values if they don't exist
@@ -68,7 +75,8 @@ end
 
 local function getUsername(pkg)
     -- Redirect stderr ke /dev/null agar error tidak muncul di layar
-    local handle = io.popen("su -c 'cat /data/data/" .. pkg .. "/shared_prefs/prefs.xml 2>/dev/null' 2>/dev/null")
+    -- Tambahkan timeout 2 detik agar tidak stuck jika su bermasalah
+    local handle = io.popen("timeout 2 su -c 'cat /data/data/" .. pkg .. "/shared_prefs/prefs.xml 2>/dev/null' 2>/dev/null")
     if not handle then return nil end
     local content = handle:read("*a")
     handle:close()
@@ -180,7 +188,7 @@ local function GetSystemMemory()
     return result and result:gsub("\n", "") or "N/A"
 end
 
-local function DrawDashboard(statuses, config)
+local function DrawDashboard(statuses, config, cached_users)
     os.execute("clear")
     print(iceblue.."╔══════════════════════════════════════════════════╗"..reset)
     print(iceblue.."║           🚀 DIVINE MONITOR DASHBOARD 🚀         ║"..reset)
@@ -201,7 +209,8 @@ local function DrawDashboard(statuses, config)
         elseif s == "OPTIMIZING" then color = "\27[35m"
         end
         
-        local user = getUsername(pkg)
+        -- Gunakan cache jika ada, jika tidak baru cek manual (untuk menu config)
+        local user = cached_users and cached_users[pkg] or getUsername(pkg)
         local display_name = user and (config.mask_username and maskString(user) or user) or pkg
         if #display_name > 23 then display_name = display_name:sub(1, 20).."..." end
         
@@ -226,10 +235,11 @@ local function configMenu()
         print("  [5] Delay Launch")
         print("  [6] Delay Relaunch Loop")
         print("  [7] Mask Username Toggle")
-        print("  [8] Back to Main Menu")
+        print("  [8] Show All Config")
+        print("  [9] Back to Main Menu")
 
         border()
-        io.write(yellow.."Select option (1-8): "..reset)
+        io.write(yellow.."Select option (1-9): "..reset)
         local c = io.read()
 
         os.execute("clear")
@@ -386,7 +396,9 @@ local function configMenu()
                 print(yellow.."URLs per Package:"..reset)
                 if config.private_servers.urls and next(config.private_servers.urls) then
                      for pkg, url in pairs(config.private_servers.urls) do
-                        print("  - " .. pkg .. ": " .. url)
+                        local user = getUsername(pkg)
+                        local display = user and (pkg .. " (" .. user .. ")") or pkg
+                        print("  - " .. display .. ": " .. url)
                      end
                 else
                     print("  (No URLs set)")
@@ -413,8 +425,10 @@ local function configMenu()
                     config.private_servers.url = "" -- Hapus data mode lain
                     print(yellow.."\nEnter the URL for each package (press ENTER to keep current):"..reset)
                     for _, pkg in ipairs(config.packages) do
+                        local user = getUsername(pkg)
+                        local display = user and (pkg .. " (" .. user .. ")") or pkg
                         local current_url = config.private_servers.urls[pkg] or ""
-                        io.write("  - " .. pkg .. " ["..current_url.."]: "..reset)
+                        io.write("  - " .. display .. " ["..current_url.."]: "..reset)
                         local new_url = io.read()
                         if new_url and new_url ~= "" then config.private_servers.urls[pkg] = new_url end
                     end
@@ -543,6 +557,54 @@ local function configMenu()
             end
 
         elseif c == "8" then
+            border()
+            print("        "..green.."✦ CURRENT CONFIGURATION ✦"..reset)
+            border()
+            local config = loadConfig()
+            
+            -- Packages
+            print(iceblue.."📦 PACKAGES ("..#config.packages.."):"..reset)
+            if #config.packages == 0 then
+                print(red.."  No packages configured."..reset)
+            else
+                for i, pkg in ipairs(config.packages) do
+                    local user = getUsername(pkg)
+                    local display = user and (pkg .. " (" .. user .. ")") or pkg
+                    if config.mask_username and user then display = pkg .. " (" .. maskString(user) .. ")" end
+                    print("  ["..i.."] " .. display)
+                end
+            end
+            
+            -- Private Servers
+            print("\n"..iceblue.."🔗 PRIVATE SERVERS:"..reset)
+            print("  Mode: " .. (config.private_servers.mode or "N/A"))
+            if config.private_servers.mode == "same" then
+                print("  URL: " .. (config.private_servers.url or "None"))
+            elseif config.private_servers.mode == "per_package" then
+                for pkg, url in pairs(config.private_servers.urls or {}) do
+                    print("  - " .. pkg .. ": " .. url)
+                end
+            end
+
+            -- Webhook
+            print("\n"..iceblue.."📢 WEBHOOK:"..reset)
+            print("  Enabled: " .. tostring(config.webhook.enabled))
+            if config.webhook.enabled then
+                print("  URL: " .. (config.webhook.url or "None"))
+                print("  Mode: " .. (config.webhook.mode or "new"))
+                print("  Interval: " .. (config.webhook.interval or 0) .. "m")
+                print("  Tag Everyone: " .. tostring(config.webhook.tag_everyone))
+            end
+
+            -- Delays & Misc
+            print("\n"..iceblue.."⚙️ MISC SETTINGS:"..reset)
+            print("  Delay Launch: " .. (config.delay_launch or 0) .. "s")
+            print("  Relaunch Loop: " .. (config.delay_relaunch or 0) .. "m")
+            print("  Mask Username: " .. tostring(config.mask_username))
+            
+            border()
+
+        elseif c == "9" then
             break
 
         else
@@ -653,47 +715,61 @@ while true do
 
             -- Initialize Status
             local statuses = {}
+            local cached_users = {} -- Cache username agar tidak berat saat looping
+            
+            print(yellow.."Initializing & Caching Usernames..."..reset)
             for _, pkg in ipairs(config.packages) do statuses[pkg] = "IDLE" end
+            for _, pkg in ipairs(config.packages) do cached_users[pkg] = getUsername(pkg) end
             
             -- Main Loop
             while true do
                 -- 1. Optimizing & Resetting
                 for i, pkg in ipairs(config.packages) do
                     statuses[pkg] = "OPTIMIZING"
-                    DrawDashboard(statuses, config)
+                    DrawDashboard(statuses, config, cached_users)
                     os.execute("am force-stop "..pkg.." >/dev/null 2>&1")
                     os.execute("sleep 0.2")
                     
                     statuses[pkg] = "RESETTING"
-                    DrawDashboard(statuses, config)
+                    DrawDashboard(statuses, config, cached_users)
                     os.execute("sleep 0.2")
                 end
 
                 -- 2. Launching
                 for i, pkg in ipairs(config.packages) do
                     statuses[pkg] = "LAUNCHING"
-                    DrawDashboard(statuses, config)
+                    DrawDashboard(statuses, config, cached_users)
                     
                     local bounds = CalculateBounds(i, #config.packages, sw, sh)
                     local ps_url = (config.private_servers.mode == "same") and config.private_servers.url or config.private_servers.urls[pkg]
                     
-                    local cmd = "am start -n "..pkg.."/com.roblox.client.ActivityProtocolLaunch --windowingMode 5 --bounds "..bounds
-                    if ps_url and ps_url ~= "" then
-                        cmd = cmd .. " -a android.intent.action.VIEW -d \""..ps_url.."\""
-                    end
+                    -- 1. Start App Clean (-S)
+                    local cmd_launch = "am start -S -n "..pkg.."/com.roblox.client.ActivityProtocolLaunch --windowingMode 5 --bounds "..bounds
+                    os.execute(cmd_launch .. " >/dev/null 2>&1")
                     
-                    os.execute(cmd .. " >/dev/null 2>&1")
+                    -- 2. Wait 5 seconds for app to initialize
+                    statuses[pkg] = "WAITING LINK"
+                    DrawDashboard(statuses, config, cached_users)
+                    os.execute("sleep 5")
+
+                    -- 3. Send Private Server Link
+                    if ps_url and ps_url ~= "" then
+                        statuses[pkg] = "JOINING"
+                        DrawDashboard(statuses, config, cached_users)
+                        local cmd_link = "am start -n "..pkg.."/com.roblox.client.ActivityProtocolLaunch -a android.intent.action.VIEW -d \""..ps_url.."\" --windowingMode 5 --bounds "..bounds
+                        os.execute(cmd_link .. " >/dev/null 2>&1")
+                    end
                     
                     if config.delay_launch > 0 then
                         for d = config.delay_launch, 1, -1 do
                             statuses[pkg] = "WAITING ("..d.."s)"
-                            DrawDashboard(statuses, config)
+                            DrawDashboard(statuses, config, cached_users)
                             os.execute("sleep 1")
                         end
                     end
                     
                     statuses[pkg] = "ONLINE"
-                    DrawDashboard(statuses, config)
+                    DrawDashboard(statuses, config, cached_users)
                 end
 
                 -- 3. Keep-Alive / Monitor Phase
@@ -701,12 +777,12 @@ while true do
                 if loop_delay > 0 then
                     local start_time = os.time()
                     while (os.time() - start_time) < loop_delay do
-                        DrawDashboard(statuses, config)
+                        DrawDashboard(statuses, config, cached_users)
                         os.execute("sleep 1")
                     end
                 else
                     while true do
-                        DrawDashboard(statuses, config)
+                        DrawDashboard(statuses, config, cached_users)
                         os.execute("sleep 5")
                     end
                 end
@@ -775,7 +851,9 @@ while true do
                     config.private_servers.urls = {}
                     print(yellow.."Enter URL for each package:"..reset)
                     for _, pkg in ipairs(config.packages) do
-                        io.write("  "..pkg..": ")
+                        local user = getUsername(pkg)
+                        local display = user and (pkg .. " (" .. user .. ")") or pkg
+                        io.write("  "..display..": ")
                         local u = io.read()
                         config.private_servers.urls[pkg] = u
                     end

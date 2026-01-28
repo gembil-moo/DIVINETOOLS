@@ -17,7 +17,10 @@ tsu \
 figlet \
 toilet \
 ncurses-utils \
-android-tools
+android-tools \
+coreutils \
+clang \
+make
 
 # Install Lua modules
 echo "[*] Installing Lua modules..."
