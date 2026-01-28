@@ -794,7 +794,7 @@ while true do
                     local ps_url = (config.private_servers.mode == "same") and config.private_servers.url or config.private_servers.urls[pkg]
                     
                     -- 1. Start App Clean (-S)
-                    local cmd_launch = "am start -S -n "..pkg.."/com.roblox.client.startup.ActivitySplash --windowingMode 5 --bounds "..bounds
+                    local cmd_launch = "am start -S -n "..pkg.."/com.roblox.client.startup.ActivitySplash"
                     print(yellow.."\n[DEBUG] Launching "..pkg..reset)
                     os.execute(cmd_launch .. " >/dev/null 2>&1")
                     
@@ -807,7 +807,8 @@ while true do
                     if ps_url and ps_url ~= "" then
                         statuses[pkg] = "JOINING"
                         DrawDashboard(statuses, config, cached_users)
-                        local cmd_link = "am start -n "..pkg.."/com.roblox.client.startup.ActivitySplash -a android.intent.action.VIEW -d \""..ps_url.."\" --windowingMode 5 --bounds "..bounds
+                        -- Kirim intent ke paket yang sudah ada, tanpa flag windowing agar tidak mengganggu
+                        local cmd_link = "am start -a android.intent.action.VIEW -d \""..ps_url.."\" -p "..pkg
                         print(yellow.."[DEBUG] Sending link to "..pkg..reset)
                         os.execute(cmd_link .. " >/dev/null 2>&1")
                     end
