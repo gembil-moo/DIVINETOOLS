@@ -92,9 +92,10 @@ if [ ! -f "config/config.json" ] && [ -f "config.example.json" ]; then
     echo -e "${GREEN}[+] Created default config${NC}"
 fi
 
-echo -e "${GREEN}[+] Installation complete!${NC}"
-echo -e "${GREEN}[+] Run with: ./run.sh${NC}"
-echo -e "\n${YELLOW}Next steps:${NC}"
-echo -e "1. Edit config/config.json if needed"
-echo -e "2. Run: ./run.sh"
-echo -e "3. Select 'First Configuration' in menu"
+echo "[+] Installation complete!"
+echo "[+] Run with: ./run.sh"
+echo ""
+echo "Next steps:"
+echo "1. Edit config/config.json if needed"
+echo "2. Run: ./run.sh"
+echo "3. Select 'First Configuration' in menu"
