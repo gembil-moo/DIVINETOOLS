@@ -264,11 +264,12 @@ local function GetSystemMemory()
     if not handle then return "N/A" end
     local result = handle:read("*a")
     handle:close()
-    return result and result:gsub("\n", "") or "N/A"
+    return result and result:gsub("[\r\n]", "") or "N/A"
 end
 
 local function DrawDashboard(statuses, config, cached_users)
-    os.execute("clear")
+    -- Gunakan ANSI escape code untuk membersihkan layar, lebih cepat dan andal
+    io.write("\27[2J\27[H")
     print(iceblue.."╔══════════════════════════════════════════════════╗"..reset)
     print(iceblue.."║           🚀 DIVINE MONITOR DASHBOARD 🚀         ║"..reset)
     print(iceblue.."╠══════════════════════════════════════════════════╣"..reset)
