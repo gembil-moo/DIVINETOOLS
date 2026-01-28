@@ -293,7 +293,7 @@ local function DrawDashboard(statuses, config, cached_users)
         local display_name = user and (config.mask_username and maskString(user) or user) or pkg
         if #display_name > 23 then display_name = display_name:sub(1, 20).."..." end
         
-        print(iceblue.."║"..reset..string.format(" %-3d | %-25s | %s%-14s", i, display_name, color, s)..iceblue.." ║"..reset)
+        print(iceblue.."║"..reset..string.format(" %-3d | %-25s | ", i, display_name) .. color .. string.format("%-14s", s) .. reset .. iceblue .. " ║" .. reset)
     end
     print(iceblue.."╚══════════════════════════════════════════════════╝"..reset)
     print(iceblue.." [CTRL+C] to Stop Monitor"..reset)
