@@ -2,15 +2,9 @@
 
 echo "[*] Setting up DIVINETOOLS environment..."
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
 # Check if running in Termux
 if [ -z "$TERMUX_VERSION" ]; then
-    echo -e "${YELLOW}[!] Warning: This script is designed for Termux${NC}"
+    echo "[!] Warning: This script is designed for Termux"
     read -p "Continue anyway? (y/n): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -19,26 +13,26 @@ if [ -z "$TERMUX_VERSION" ]; then
 fi
 
 # Check dependencies
-echo -e "[*] Checking dependencies..."
+echo "[*] Checking dependencies..."
 for cmd in curl wget git; do
     if ! command -v $cmd &> /dev/null; then
-        echo -e "${YELLOW}[!] Installing $cmd...${NC}"
+        echo "[!] Installing $cmd..."
         pkg install -y $cmd 2>/dev/null || apt-get install -y $cmd 2>/dev/null
     fi
 done
 
 # Request storage permission (Termux)
 if [ -n "$TERMUX_VERSION" ]; then
-    echo -e "[*] Requesting storage access..."
+    echo "[*] Requesting storage access..."
     termux-setup-storage
 fi
 
 # Update system
-echo -e "[*] Updating package lists..."
+echo "[*] Updating package lists..."
 pkg update -y && pkg upgrade -y
 
 # Install system packages
-echo -e "[*] Installing required packages..."
+echo "[*] Installing required packages..."
 pkg install -y \
     lua53 \
     luarocks \
@@ -57,39 +51,39 @@ pkg install -y \
     jq 2>/dev/null
 
 # Install Lua modules
-echo -e "[*] Installing Lua modules..."
-luarocks install lua-cjson 2>/dev/null || echo -e "${YELLOW}[!] Failed to install lua-cjson${NC}"
-luarocks install luasocket 2>/dev/null || echo -e "${YELLOW}[!] Failed to install luasocket${NC}"
+echo "[*] Installing Lua modules..."
+luarocks install lua-cjson 2>/dev/null || echo "[!] Failed to install lua-cjson"
+luarocks install luasocket 2>/dev/null || echo "[!] Failed to install luasocket"
 
 # Install Python libraries
-echo -e "[*] Installing Python packages..."
+echo "[*] Installing Python packages..."
 if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt 2>/dev/null || echo -e "${YELLOW}[!] Failed to install Python packages${NC}"
+    pip install -r requirements.txt 2>/dev/null || echo "[!] Failed to install Python packages"
 else
-    echo -e "${YELLOW}[!] requirements.txt not found${NC}"
+    echo "[!] requirements.txt not found"
     pip install pyfiglet rich 2>/dev/null
 fi
 
 # Create necessary directories
-echo -e "[*] Creating directory structure..."
+echo "[*] Creating directory structure..."
 mkdir -p config logs scripts/autoexec scripts/divine src/modules
 
 # Set permissions
-echo -e "[*] Setting permissions..."
+echo "[*] Setting permissions..."
 chmod +x run.sh
 chmod +x install.sh
 
 # Check for root access
 if su -c "echo 'Root check'" &>/dev/null; then
-    echo -e "$[+] Root access available${NC}"
+    echo "[+] Root access available"
 else
-    echo -e "[!] Root access not available. Some features may be limited.${NC}"
+    echo "[!] Root access not available. Some features may be limited."
 fi
 
 # Create example config if not exists
 if [ ! -f "config/config.json" ] && [ -f "config.example.json" ]; then
     cp config.example.json config/config.json
-    echo -e "[+] Created default config${NC}"
+    echo "[+] Created default config"
 fi
 
 echo "[+] Installation complete!"
