@@ -38,38 +38,38 @@ fi
 # Update system
 print_info "Updating package lists..."
 pkg update -y && pkg upgrade -y
-
 # Install system packages
 print_info "Installing required packages..."
 pkg install -y \
     lua53 \
     luarocks \
     python \
-    python-pip \
     tsu \
     figlet \
     toilet \
     ncurses-utils \
     android-tools \
     coreutils \
-    clang \
-    make \
     zip \
     unzip \
-    jq 2>/dev/null
+    jq
+
+# Dependensi untuk build C module (seperti cjson)
+print_info "Installing build dependencies..."
+pkg install -y make clang
 
 # Install Lua modules
 print_info "Installing Lua modules..."
-luarocks install lua-cjson 2>/dev/null || print_warn "Failed to install lua-cjson"
-luarocks install luasocket 2>/dev/null || print_warn "Failed to install luasocket"
+luarocks install lua-cjson || print_error "Failed to install lua-cjson. Coba 'pkg install -y make clang'."
+luarocks install luasocket || print_warn "Failed to install luasocket"
 
 # Install Python libraries
 print_info "Installing Python packages..."
 if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt 2>/dev/null || print_warn "Failed to install Python packages"
+    pip install -r requirements.txt || print_warn "Failed to install Python packages from requirements.txt"
 else
     print_warn "requirements.txt not found"
-    pip install pyfiglet rich 2>/dev/null
+    pip install pyfiglet rich
 fi
 
 # Create necessary directories
@@ -91,7 +91,7 @@ if [ -f "install.sh" ]; then
 fi
 
 # Check for root access - FORMAT INI YANG DIPERBAIKI
-if su -c "echo 'Root check'" &>/dev/null; then
+if timeout 1 su -c "echo 'Root check'" &>/dev/null; then
     print_ok "Root access available"
 else
     print_warn "Root access not available. Some features may be limited."
