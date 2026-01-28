@@ -50,12 +50,19 @@ local function loadConfig()
 
     -- Set default values if they don't exist
     if not config.packages then config.packages = {} end
-    if not config.private_servers then
-        config.private_servers = { mode = "same", url = "", urls = {} }
-    end
-    if not config.webhook then
-        config.webhook = { enabled = false, url = "", mode = "new", interval = 5, tag_everyone = false }
-    end
+    
+    if not config.private_servers then config.private_servers = {} end
+    if not config.private_servers.mode then config.private_servers.mode = "same" end
+    if not config.private_servers.url then config.private_servers.url = "" end
+    if not config.private_servers.urls then config.private_servers.urls = {} end
+
+    if not config.webhook then config.webhook = {} end
+    if config.webhook.enabled == nil then config.webhook.enabled = false end
+    if not config.webhook.url then config.webhook.url = "" end
+    if not config.webhook.mode then config.webhook.mode = "new" end
+    if not config.webhook.interval then config.webhook.interval = 5 end
+    if config.webhook.tag_everyone == nil then config.webhook.tag_everyone = false end
+
     if not config.delay_launch then config.delay_launch = 0 end
     if not config.delay_relaunch then config.delay_relaunch = 0 end
     if config.mask_username == nil then config.mask_username = false end
@@ -71,6 +78,27 @@ local function saveConfig(config)
     else
         print(red.."Error: Could not save config."..reset)
     end
+end
+
+local function getUsername(pkg)
+    -- Redirect stderr ke /dev/null agar error tidak muncul di layar
+    -- Tambahkan timeout 2 detik agar tidak stuck jika su bermasalah
+    local handle = io.popen("timeout 2 su -c 'cat /data/data/" .. pkg .. "/shared_prefs/prefs.xml 2>/dev/null' 2>/dev/null")
+    if not handle then return nil end
+    local content = handle:read("*a")
+    handle:close()
+    
+    local user = content and content:match('name="username">([^<]+)<') or nil
+    if user then
+        user = user:gsub("[\r\n]", "") -- Hapus newline agar tidak merusak UI
+        user = user:gsub("%s+", "")    -- Hapus spasi berlebih
+    end
+    return user
+end
+
+local function maskString(str)
+    if not str or #str <= 4 then return str end
+    return str:sub(1, 3) .. "xxx" .. str:sub(-2)
 end
 
 local function displayFullConfig(config)
@@ -116,27 +144,6 @@ local function displayFullConfig(config)
     print("  Mask Username: " .. tostring(config.mask_username))
     
     border()
-end
-
-local function getUsername(pkg)
-    -- Redirect stderr ke /dev/null agar error tidak muncul di layar
-    -- Tambahkan timeout 2 detik agar tidak stuck jika su bermasalah
-    local handle = io.popen("timeout 2 su -c 'cat /data/data/" .. pkg .. "/shared_prefs/prefs.xml 2>/dev/null' 2>/dev/null")
-    if not handle then return nil end
-    local content = handle:read("*a")
-    handle:close()
-    
-    local user = content and content:match('name="username">([^<]+)<') or nil
-    if user then
-        user = user:gsub("[\r\n]", "") -- Hapus newline agar tidak merusak UI
-        user = user:gsub("%s+", "")    -- Hapus spasi berlebih
-    end
-    return user
-end
-
-local function maskString(str)
-    if not str or #str <= 4 then return str end
-    return str:sub(1, 3) .. "xxx" .. str:sub(-2)
 end
 
 -- ===== EXECUTOR HELPER =====
