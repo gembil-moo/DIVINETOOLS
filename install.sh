@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "[*] Setting up DIVINETOOLS environment..."
+echo "[*] Working directory: $(pwd)"
 
 # Check if running in Termux
 if [ -z "$TERMUX_VERSION" ]; then
@@ -68,10 +69,26 @@ fi
 echo "[*] Creating directory structure..."
 mkdir -p config logs scripts/autoexec scripts/divine src/modules
 
-# Set permissions
+# Set permissions - DENGAN CEK FILE DULU!
 echo "[*] Setting permissions..."
-chmod +x run.sh
-chmod +x install.sh
+if [ -f "run.sh" ]; then
+    chmod +x run.sh
+    echo "[+] run.sh permissions set"
+else
+    echo "[!] run.sh not found - creating basic run.sh..."
+    cat > run.sh << 'EOF'
+#!/bin/bash
+echo "[*] DIVINETOOLS Launcher"
+echo "[*] Place main.lua in src/ folder"
+echo "[!] Please configure the application first"
+EOF
+    chmod +x run.sh
+fi
+
+if [ -f "install.sh" ]; then
+    chmod +x install.sh
+    echo "[+] install.sh permissions set"
+fi
 
 # Check for root access
 if su -c "echo 'Root check'" &>/dev/null; then
@@ -84,8 +101,20 @@ fi
 if [ ! -f "config/config.json" ] && [ -f "config.example.json" ]; then
     cp config.example.json config/config.json
     echo "[+] Created default config"
+elif [ ! -f "config/config.json" ] && [ ! -f "config.example.json" ]; then
+    echo "[*] Creating minimal config.json..."
+    mkdir -p config
+    cat > config/config.json << 'EOF'
+{
+    "version": "2.0.0",
+    "first_run": true,
+    "log_level": "info"
+}
+EOF
+    echo "[+] Created minimal config"
 fi
 
+echo ""
 echo "[+] Installation complete!"
 echo "[+] Run with: ./run.sh"
 echo ""
@@ -93,3 +122,6 @@ echo "Next steps:"
 echo "1. Edit config/config.json if needed"
 echo "2. Run: ./run.sh"
 echo "3. Select 'First Configuration' in menu"
+echo ""
+echo "Current directory contents:"
+ls -la
