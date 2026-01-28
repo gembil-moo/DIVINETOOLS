@@ -73,6 +73,51 @@ local function saveConfig(config)
     end
 end
 
+local function displayFullConfig(config)
+    border()
+    print("        "..green.."✦ CURRENT CONFIGURATION ✦"..reset)
+    border()
+    
+    -- Packages & URLs
+    print(iceblue.."📦 PACKAGES & SERVERS ("..#config.packages.."):"..reset)
+    if #config.packages == 0 then
+        print(red.."  No packages configured."..reset)
+    else
+        for i, pkg in ipairs(config.packages) do
+            local user = getUsername(pkg)
+            local display_user = user and (config.mask_username and maskString(user) or user) or "N/A"
+            
+            local url = "None"
+            if config.private_servers.mode == "same" then
+                url = config.private_servers.url or "None"
+            elseif config.private_servers.mode == "per_package" then
+                url = config.private_servers.urls[pkg] or "None"
+            end
+            
+            print(string.format("  [%d] %s (%s)", i, pkg, display_user))
+            print(string.format("      └─ URL: %s", url))
+        end
+    end
+    
+    -- Webhook
+    print("\n"..iceblue.."📢 WEBHOOK:"..reset)
+    print("  Enabled: " .. tostring(config.webhook.enabled))
+    if config.webhook.enabled then
+        print("  URL: " .. (config.webhook.url or "None"))
+        print("  Mode: " .. (config.webhook.mode or "new"))
+        print("  Interval: " .. (config.webhook.interval or 0) .. "m")
+        print("  Tag Everyone: " .. tostring(config.webhook.tag_everyone))
+    end
+
+    -- Delays & Misc
+    print("\n"..iceblue.."⚙️ MISC SETTINGS:"..reset)
+    print("  Delay Launch: " .. (config.delay_launch or 0) .. "s")
+    print("  Relaunch Loop: " .. (config.delay_relaunch or 0) .. "m")
+    print("  Mask Username: " .. tostring(config.mask_username))
+    
+    border()
+end
+
 local function getUsername(pkg)
     -- Redirect stderr ke /dev/null agar error tidak muncul di layar
     -- Tambahkan timeout 2 detik agar tidak stuck jika su bermasalah
@@ -557,52 +602,7 @@ local function configMenu()
             end
 
         elseif c == "8" then
-            border()
-            print("        "..green.."✦ CURRENT CONFIGURATION ✦"..reset)
-            border()
-            local config = loadConfig()
-            
-            -- Packages
-            print(iceblue.."📦 PACKAGES ("..#config.packages.."):"..reset)
-            if #config.packages == 0 then
-                print(red.."  No packages configured."..reset)
-            else
-                for i, pkg in ipairs(config.packages) do
-                    local user = getUsername(pkg)
-                    local display = user and (pkg .. " (" .. user .. ")") or pkg
-                    if config.mask_username and user then display = pkg .. " (" .. maskString(user) .. ")" end
-                    print("  ["..i.."] " .. display)
-                end
-            end
-            
-            -- Private Servers
-            print("\n"..iceblue.."🔗 PRIVATE SERVERS:"..reset)
-            print("  Mode: " .. (config.private_servers.mode or "N/A"))
-            if config.private_servers.mode == "same" then
-                print("  URL: " .. (config.private_servers.url or "None"))
-            elseif config.private_servers.mode == "per_package" then
-                for pkg, url in pairs(config.private_servers.urls or {}) do
-                    print("  - " .. pkg .. ": " .. url)
-                end
-            end
-
-            -- Webhook
-            print("\n"..iceblue.."📢 WEBHOOK:"..reset)
-            print("  Enabled: " .. tostring(config.webhook.enabled))
-            if config.webhook.enabled then
-                print("  URL: " .. (config.webhook.url or "None"))
-                print("  Mode: " .. (config.webhook.mode or "new"))
-                print("  Interval: " .. (config.webhook.interval or 0) .. "m")
-                print("  Tag Everyone: " .. tostring(config.webhook.tag_everyone))
-            end
-
-            -- Delays & Misc
-            print("\n"..iceblue.."⚙️ MISC SETTINGS:"..reset)
-            print("  Delay Launch: " .. (config.delay_launch or 0) .. "s")
-            print("  Relaunch Loop: " .. (config.delay_relaunch or 0) .. "m")
-            print("  Mask Username: " .. tostring(config.mask_username))
-            
-            border()
+            displayFullConfig(loadConfig())
 
         elseif c == "9" then
             break
@@ -698,7 +698,7 @@ while true do
     if pilih == "1" then
         local config = loadConfig()
         if #config.packages == 0 then
-            print(red.."No packages configured! Go to First Configuration."..reset)
+            print(red.."No configuration found! Please run 'First Configuration' first."..reset)
             io.read()
         else
             -- Get Screen Resolution
@@ -798,8 +798,8 @@ while true do
 
         local proceed = true
         if #config.packages > 0 then
-            print(yellow.."Existing configuration found ("..#config.packages.." packages)."..reset)
-            io.write(red.."Overwrite? (y/n): "..reset)
+            displayFullConfig(config)
+            io.write(red.."\nExisting configuration found. Overwrite? (y/n): "..reset)
             if io.read():lower() ~= "y" then
                 proceed = false
                 print(red.."\nCancelled."..reset)
@@ -952,7 +952,12 @@ while true do
         end
 
     elseif pilih == "3" then
-        configMenu()
+        local config = loadConfig()
+        if #config.packages == 0 then
+            print(red.."No configuration found! Please run 'First Configuration' first."..reset)
+        else
+            configMenu()
+        end
 
     elseif pilih == "4" then
         OptimizeSystem()

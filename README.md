@@ -2,22 +2,23 @@
 
 Tools utility untuk manajemen paket dan optimasi di Android (Termux).
 
-## Cara Install
+## 📥 Cara Install
 
-1. Buka Termux dan lakukan update serta install Git:
+1. Buka Termux, lalu update dan install Git:
    ```bash
    pkg update && pkg upgrade -y
    pkg install git -y
    ```
-2. Download repository dan jalankan installer:
+
+2. Download script dan jalankan installer:
    ```bash
    cd $HOME
-   git clone https://github.com/USERNAME/DIVINETOOLS.git
+   git clone https://github.com/gembil-moo/DIVINETOOLS.git
    cd DIVINETOOLS
    bash install.sh
    ```
 
-## Cara Menjalankan
+## 🚀 Cara Menjalankan
 
 ```bash
 ./run.sh
