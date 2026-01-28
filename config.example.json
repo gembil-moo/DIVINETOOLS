@@ -1,0 +1,48 @@
+{
+    "version": "2.0",
+    "packages": [
+        "com.roblox.client",
+        "com.roblox.alt"
+    ],
+    "private_servers": {
+        "mode": "same",
+        "url": "https://www.roblox.com/games/123456789/Private-Server",
+        "urls": {
+            "com.roblox.client": "https://www.roblox.com/games/123456789/Server1",
+            "com.roblox.alt": "https://www.roblox.com/games/123456789/Server2"
+        }
+    },
+    "webhook": {
+        "enabled": false,
+        "url": "https://discord.com/api/webhooks/...",
+        "mode": "new",
+        "interval": 5,
+        "tag_everyone": false,
+        "message_id": ""
+    },
+    "delays": {
+        "launch": 0,
+        "relaunch": 0,
+        "between_packages": 2
+    },
+    "display": {
+        "mask_username": true,
+        "show_memory": true,
+        "show_time": true,
+        "refresh_rate": 0.5
+    },
+    "optimization": {
+        "low_resolution": false,
+        "god_mode": false,
+        "clear_cache_on_start": true
+    },
+    "scripts": {
+        "auto_inject": true,
+        "custom_scripts": []
+    },
+    "monitoring": {
+        "check_interval": 30,
+        "auto_restart": true,
+        "max_restart_attempts": 3
+    }
+}

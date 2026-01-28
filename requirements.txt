@@ -1,2 +1,3 @@
-pyfiglet
-rich
+pyfiglet==1.0.2
+rich==13.7.0
+requests==2.31.0
