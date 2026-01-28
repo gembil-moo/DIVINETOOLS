@@ -273,10 +273,10 @@ local function DrawDashboard(statuses, config, cached_users)
     print(iceblue.."╔══════════════════════════════════════════════════╗"..reset)
     print(iceblue.."║           🚀 DIVINE MONITOR DASHBOARD 🚀         ║"..reset)
     print(iceblue.."╠══════════════════════════════════════════════════╣"..reset)
-    print(iceblue.."║"..yellow.." MEMORY: "..reset..string.format("%-36s", GetSystemMemory())..iceblue.."║"..reset)
-    print(iceblue.."║"..yellow.." TIME  : "..reset..string.format("%-36s", os.date("%H:%M:%S"))..iceblue.."║"..reset)
+    print(iceblue.."║"..yellow.." MEMORY: "..reset..string.format("%-41s", GetSystemMemory())..iceblue.."║"..reset)
+    print(iceblue.."║"..yellow.." TIME  : "..reset..string.format("%-41s", os.date("%H:%M:%S"))..iceblue.."║"..reset)
     print(iceblue.."╠══════════════════════════════════════════════════╣"..reset)
-    print(iceblue.."║ NO  | PACKAGE                   | STATUS         ║"..reset)
+    print(iceblue.."║"..reset.." NO  | PACKAGE                   | STATUS         "..iceblue.."║"..reset)
     print(iceblue.."╠══════════════════════════════════════════════════╣"..reset)
     
     for i, pkg in ipairs(config.packages) do
