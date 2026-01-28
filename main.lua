@@ -745,13 +745,19 @@ while true do
         else
             -- Get Screen Resolution
             local sw, sh = 1080, 2400 -- Default
-            local h_wm = io.popen("wm size")
+            print(yellow.."[*] Getting screen resolution (requires root)..."..reset)
+            local h_wm = io.popen("su -c 'wm size'")
             if h_wm then
                 local res = h_wm:read("*a")
                 h_wm:close()
                 if res then
                     local w, h = res:match("Physical size: (%d+)x(%d+)")
-                    if w and h then sw, sh = tonumber(w), tonumber(h) end
+                    if w and h then 
+                        sw, sh = tonumber(w), tonumber(h) 
+                        print(green.."    -> Detected: "..sw.."x"..sh..reset)
+                    else
+                        print(red.."    -> Could not detect. Using default: "..sw.."x"..sh..reset)
+                    end
                 end
             end
 
@@ -763,6 +769,8 @@ while true do
             for _, pkg in ipairs(config.packages) do statuses[pkg] = "IDLE" end
             for _, pkg in ipairs(config.packages) do cached_users[pkg] = getUsername(pkg) end
             
+            print(green.."\n[+] Starting monitoring loop... Press CTRL+C to stop."..reset)
+            os.execute("sleep 2")
             -- Main Loop
             while true do
                 -- 1. Optimizing & Resetting
@@ -787,6 +795,7 @@ while true do
                     
                     -- 1. Start App Clean (-S)
                     local cmd_launch = "am start -S -n "..pkg.."/com.roblox.client.ActivityProtocolLaunch --windowingMode 5 --bounds "..bounds
+                    print(yellow.."\n[DEBUG] Launching "..pkg..reset)
                     os.execute(cmd_launch .. " >/dev/null 2>&1")
                     
                     -- 2. Wait 5 seconds for app to initialize
@@ -799,6 +808,7 @@ while true do
                         statuses[pkg] = "JOINING"
                         DrawDashboard(statuses, config, cached_users)
                         local cmd_link = "am start -n "..pkg.."/com.roblox.client.ActivityProtocolLaunch -a android.intent.action.VIEW -d \""..ps_url.."\" --windowingMode 5 --bounds "..bounds
+                        print(yellow.."[DEBUG] Sending link to "..pkg..reset)
                         os.execute(cmd_link .. " >/dev/null 2>&1")
                     end
                     
