@@ -81,15 +81,15 @@ chmod +x install.sh
 
 # Check for root access
 if su -c "echo 'Root check'" &>/dev/null; then
-    echo -e "${GREEN}[+] Root access available${NC}"
+    echo -e "$[+] Root access available${NC}"
 else
-    echo -e "${YELLOW}[!] Root access not available. Some features may be limited.${NC}"
+    echo -e "[!] Root access not available. Some features may be limited.${NC}"
 fi
 
 # Create example config if not exists
 if [ ! -f "config/config.json" ] && [ -f "config.example.json" ]; then
     cp config.example.json config/config.json
-    echo -e "${GREEN}[+] Created default config${NC}"
+    echo -e "[+] Created default config${NC}"
 fi
 
 echo "[+] Installation complete!"
