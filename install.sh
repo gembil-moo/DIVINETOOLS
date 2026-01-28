@@ -1,17 +1,14 @@
 #!/bin/bash
-# DIVINETOOLS Installer - ANTI FREEZE VERSION
+# DIVINETOOLS Installer - FIXED FORMAT VERSION
 
 echo "[*] Setting up DIVINETOOLS environment..."
 echo "[*] Working directory: $(pwd)"
 
-# FUNGSI PRINT AMAN (TANPA WARNA)
+# FUNGSI PRINT DENGAN FORMAT KONSISTEN
 print_info() { echo "[*] $1"; }
-print_success() { echo "[+] $1"; }
+print_ok() { echo "[+] $1"; }
 print_warn() { echo "[!] $1"; }
 print_error() { echo "[ERROR] $1"; }
-
-# DISABLE SEMUA WARNA DAN ANSI CODES
-export TERM=xterm-mono
 
 # Check if running in Termux
 if [ -z "$TERMUX_VERSION" ]; then
@@ -81,12 +78,21 @@ mkdir -p config logs scripts/autoexec scripts/divine src/modules
 
 # Set permissions
 print_info "Setting permissions..."
-[ -f "run.sh" ] && chmod +x run.sh && print_success "run.sh permissions set"
-[ -f "install.sh" ] && chmod +x install.sh && print_success "install.sh permissions set"
+if [ -f "run.sh" ]; then
+    chmod +x run.sh
+    print_ok "run.sh permissions set"
+else
+    print_warn "run.sh not found"
+fi
 
-# Check for root access
+if [ -f "install.sh" ]; then
+    chmod +x install.sh
+    print_ok "install.sh permissions set"
+fi
+
+# Check for root access - FORMAT INI YANG DIPERBAIKI
 if su -c "echo 'Root check'" &>/dev/null; then
-    print_success "Root access available"
+    print_ok "Root access available"
 else
     print_warn "Root access not available. Some features may be limited."
 fi
@@ -94,7 +100,7 @@ fi
 # Create example config if not exists
 if [ ! -f "config/config.json" ] && [ -f "config.example.json" ]; then
     cp config.example.json config/config.json
-    print_success "Created default config"
+    print_ok "Created default config"
 elif [ ! -f "config/config.json" ]; then
     print_info "Creating minimal config..."
     mkdir -p config
@@ -105,18 +111,17 @@ elif [ ! -f "config/config.json" ]; then
     "log_level": "info"
 }
 CONFIG_EOF
-    print_success "Created minimal config"
+    print_ok "Created minimal config"
 fi
 
-# FINAL OUTPUT - PLAIN TEXT, NO FORMATTING
+# OUTPUT FINAL - SEMUA SEJALAR KIRI
 echo ""
-print_success "Installation complete!"
-print_success "Run with: ./run.sh"
+print_ok "Installation complete!"
+print_ok "Run with: ./run.sh"
 echo ""
 echo "Next steps:"
 echo "1. Edit config/config.json if needed"
 echo "2. Run: ./run.sh"
 echo "3. Select 'First Configuration' in menu"
 echo ""
-print_info "Current directory: $(pwd)"
-print_info "Files: $(ls | tr '\n' ' ')"
+print_info "Installation finished at: $(date)"
