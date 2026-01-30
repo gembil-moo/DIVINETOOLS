@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 7.2 (Mobile UI Fix)
+# Version 7.3 (Prompt & Config Fix)
 
 # Redirect stdin to FD 3 to prevent read skipping in loops
 exec 3<&0
@@ -35,7 +35,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v7.2 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v7.3 ===${N}"
     echo ""
 }
 
@@ -60,13 +60,13 @@ configure_packages() {
     jq -r '.packages[]' "$CONFIG_FILE" | nl
 
     # 1. Package Detection
-    echo -e "${W}Auto Detect [a] or Manual [m]?${N}"
+    echo -e "${W}Auto Detect Packages? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
     read -u 3 -e PKG_OPT
-    PKG_OPT=${PKG_OPT:-a}
+    PKG_OPT=${PKG_OPT:-y}
 
     PACKAGES=()
-    if [[ "$PKG_OPT" =~ ^[Mm]$ ]]; then
+    if [[ "$PKG_OPT" =~ ^[Nn]$ ]]; then
         echo -e "${W}Enter package names (space separated):${N}"
         echo -ne "${Y}> ${N}"
         read -u 3 -e MANUAL_PKGS
@@ -90,7 +90,12 @@ configure_packages() {
 
     # Save Packages immediately
     TMP=$(mktemp)
-    jq --argjson pkgs "$(printf '%s\n' "${PACKAGES[@]}" | jq -R . | jq -s .)" '.packages = $pkgs' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+    if [ ${#PACKAGES[@]} -eq 0 ]; then
+        JSON_PKGS="[]"
+    else
+        JSON_PKGS=$(printf '%s\n' "${PACKAGES[@]}" | jq -R . | jq -s .)
+    fi
+    jq --argjson pkgs "$JSON_PKGS" '.packages = $pkgs' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
     rm -f "$TMP"
 }
 
