@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 6.2 (Nano Batch Fix)
+# Version 6.3 (Manual Menu Fix)
 
 # Colors
 C='\033[1;36m' # Cyan
@@ -21,7 +21,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v6.2 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v6.3 ===${N}"
     echo ""
 }
 
@@ -91,42 +91,37 @@ setup_wizard() {
         echo -ne "${Y}> ${N}" 
         read -r PS_URL
     else
-        # NANO BATCH EDIT MODE (Fix for Redfinger Loop Freeze)
-        msg "Batch Edit Mode"
-        echo -e "${W}[*] Opening list in Nano. Please paste your VIP Links after the '=' sign.${N}"
-        echo -e "${W}[*] Example: com.roblox.client=https://...${N}"
-        echo -e "${W}[*] Press CTRL+X, then Y, then ENTER to save and exit.${N}"
-        
-        echo -ne "${Y}Press Enter to open Nano...${N}"
-        read -r dummy
-        
-        TMP_LINKS="setup_links.tmp"
-        > "$TMP_LINKS" # Clear file
-
-        for ((i=0; i<${#PACKAGES[@]}; i++)); do
-            PKG="${PACKAGES[$i]}"
-            echo "$PKG=" >> "$TMP_LINKS"
-        done
-
-        if command -v nano >/dev/null; then
-            nano "$TMP_LINKS"
-        else
-            error "Nano not found! Please install nano (pkg install nano)."
-            rm "$TMP_LINKS"
-            return
-        fi
-
-        # Parse the file back
-        while IFS='=' read -r pkg link; do
-            # Trim whitespace (simple approach)
-            pkg=$(echo "$pkg" | tr -d '[:space:]')
-            link=$(echo "$link" | tr -d '[:space:]')
-            if [ -n "$pkg" ] && [ -n "$link" ]; then
-                PS_URLS["$pkg"]="$link"
+        # MANUAL MENU MODE (Anti-Freeze & User Friendly)
+        while true; do
+            header
+            echo -e "${W}>>> PRIVATE SERVER LINKS${N}"
+            echo -e "${C}------------------------------${N}"
+            
+            for ((i=0; i<${#PACKAGES[@]}; i++)); do
+                PKG="${PACKAGES[$i]}"
+                CURRENT="${PS_URLS[$PKG]}"
+                STATUS="${R}Empty${N}"
+                if [ -n "$CURRENT" ]; then STATUS="${G}Set${N}"; fi
+                echo -e " [${W}$((i+1))${N}] $PKG : $STATUS"
+            done
+            
+            echo -e "${C}------------------------------${N}"
+            echo -e "${W}Type number to edit link, or 'd' when done.${N}"
+            echo -ne "${Y}> ${N}"
+            read -r SEL
+            
+            if [[ "$SEL" == "d" || "$SEL" == "D" ]]; then break; fi
+            
+            if [[ "$SEL" =~ ^[0-9]+$ ]] && [ "$SEL" -ge 1 ] && [ "$SEL" -le ${#PACKAGES[@]} ]; then
+                IDX=$((SEL-1))
+                SELECTED_PKG="${PACKAGES[$IDX]}"
+                
+                echo -e "${W}Enter URL for $SELECTED_PKG:${N}"
+                echo -ne "${Y}> ${N}"
+                read -r INPUT_URL
+                if [ -n "$INPUT_URL" ]; then PS_URLS["$SELECTED_PKG"]="$INPUT_URL"; fi
             fi
-        done < "$TMP_LINKS"
-        
-        rm "$TMP_LINKS"
+        done
     fi
 
     # 3. Username Masking
