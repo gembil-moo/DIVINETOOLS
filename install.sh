@@ -25,7 +25,7 @@ header
 # 1. Update & Install Dependencies
 echo -e "${C}[*] Updating and installing dependencies...${NC}"
 pkg update -y >/dev/null 2>&1
-pkg install -y git jq tsu ncurses-utils >/dev/null 2>&1
+pkg install -y git jq tsu ncurses-utils nano >/dev/null 2>&1
 
 # 2. Create Directory Structure
 echo -e "${C}[*] Creating directory structure...${NC}"

@@ -1,9 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 6.1 (FD3 Fix)
-
-# Redirect stdin to FD 3 to prevent read skipping in loops
-exec 3<&0
+# Version 6.2 (Nano Batch Fix)
 
 # Colors
 C='\033[1;36m' # Cyan
@@ -24,7 +21,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v6.1 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v6.2 ===${N}"
     echo ""
 }
 
@@ -51,14 +48,14 @@ setup_wizard() {
     msg "Package Detection"
     echo -e "${W}Auto Detect [a] or Manual [m]?${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e PKG_OPT
+    read -r PKG_OPT
     PKG_OPT=${PKG_OPT:-a}
 
     PACKAGES=()
     if [[ "$PKG_OPT" =~ ^[Mm]$ ]]; then
         echo -e "${W}Enter package names (space separated):${N}"
         echo -ne "${Y}> ${N}"
-        read -u 3 -e MANUAL_PKGS
+        read -r MANUAL_PKGS
         IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
     else
         msg "Scanning..."
@@ -70,7 +67,7 @@ setup_wizard() {
             error "No packages found!"
             echo -e "${W}Enter manually:${N}"
             echo -ne "${Y}> ${N}"
-            read -u 3 -e MANUAL_PKGS
+            read -r MANUAL_PKGS
             IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
         else
             success "Found ${#PACKAGES[@]} packages."
@@ -82,7 +79,7 @@ setup_wizard() {
     msg "Private Servers"
     echo -e "${W}Use 1 Private Link for ALL accounts? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e ONE_LINK
+    read -r ONE_LINK
 
     PS_MODE="per_package"
     PS_URL=""
@@ -92,24 +89,44 @@ setup_wizard() {
         PS_MODE="same"
         echo -e "${W}Enter VIP Link:${N}"
         echo -ne "${Y}> ${N}" 
-        read -u 3 -e PS_URL
+        read -r PS_URL
     else
+        # NANO BATCH EDIT MODE (Fix for Redfinger Loop Freeze)
+        msg "Batch Edit Mode"
+        echo -e "${W}[*] Opening list in Nano. Please paste your VIP Links after the '=' sign.${N}"
+        echo -e "${W}[*] Example: com.roblox.client=https://...${N}"
+        echo -e "${W}[*] Press CTRL+X, then Y, then ENTER to save and exit.${N}"
+        
+        echo -ne "${Y}Press Enter to open Nano...${N}"
+        read -r dummy
+        
+        TMP_LINKS="setup_links.tmp"
+        > "$TMP_LINKS" # Clear file
+
         for ((i=0; i<${#PACKAGES[@]}; i++)); do
             PKG="${PACKAGES[$i]}"
-            # Extract Username (Suffix) or use get_username if available
-            local user=$(get_username "$PKG")
-            local display="$PKG"
-            [ -n "$user" ] && display="$PKG ($user)"
-            
-            echo "-----------------------------------"
-            echo -e "${W}Account: $PKG${N}"
-            echo -e "${W}Username: ${user:-Unknown}${N}" 
-            # Gunakan prompt yang jelas dan baca baris penuh
-            echo -e "${W}Input VIP Link (Press Enter to skip):${N}"
-            echo -ne "${Y}> ${N}" 
-            read -u 3 -e LINK
-            PS_URLS["$PKG"]="$LINK"
+            echo "$PKG=" >> "$TMP_LINKS"
         done
+
+        if command -v nano >/dev/null; then
+            nano "$TMP_LINKS"
+        else
+            error "Nano not found! Please install nano (pkg install nano)."
+            rm "$TMP_LINKS"
+            return
+        fi
+
+        # Parse the file back
+        while IFS='=' read -r pkg link; do
+            # Trim whitespace (simple approach)
+            pkg=$(echo "$pkg" | tr -d '[:space:]')
+            link=$(echo "$link" | tr -d '[:space:]')
+            if [ -n "$pkg" ] && [ -n "$link" ]; then
+                PS_URLS["$pkg"]="$link"
+            fi
+        done < "$TMP_LINKS"
+        
+        rm "$TMP_LINKS"
     fi
 
     # 3. Username Masking
@@ -117,7 +134,7 @@ setup_wizard() {
     msg "Dashboard Settings"
     echo -e "${W}Mask Usernames in Dashboard? (e.g. DIxxxNE) [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e MASK_OPT
+    read -r MASK_OPT
     MASKING=false
     [[ "$MASK_OPT" =~ ^[Yy]$ ]] && MASKING=true
 
@@ -126,7 +143,7 @@ setup_wizard() {
     msg "Webhook Settings"
     echo -e "${W}Enable Webhook? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e WH_OPT
+    read -r WH_OPT
     
     WH_ENABLED=false
     WH_URL=""
@@ -137,17 +154,17 @@ setup_wizard() {
         WH_ENABLED=true
         echo -e "${W}Webhook URL:${N}"
         echo -ne "${Y}> ${N}" 
-        read -u 3 -e WH_URL
+        read -r WH_URL
         
         echo -e "${W}Mode (1. Send New, 2. Edit):${N}"
         echo -ne "${Y}> ${N}" 
-        read -u 3 -e WH_MODE_OPT
+        read -r WH_MODE_OPT
         [[ "$WH_MODE_OPT" == "2" ]] && WH_MODE="edit"
 
         while true; do
             echo -e "${W}Interval (min 5 mins):${N}"
             echo -ne "${Y}> ${N}" 
-            read -u 3 -e WH_INTERVAL
+            read -r WH_INTERVAL
             if [[ "$WH_INTERVAL" =~ ^[0-9]+$ ]] && [ "$WH_INTERVAL" -ge 5 ]; then
                 break
             else
@@ -161,13 +178,13 @@ setup_wizard() {
     msg "Timing Settings"
     echo -e "${W}Launch Delay (seconds)? (Default 30)${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e LAUNCH_DELAY
+    read -r LAUNCH_DELAY
     LAUNCH_DELAY=${LAUNCH_DELAY:-30}
     if [ "$LAUNCH_DELAY" -lt 30 ]; then LAUNCH_DELAY=30; fi
 
     echo -e "${W}Reset Interval (minutes)? (0=Off)${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e RESET_INT
+    read -r RESET_INT
     RESET_INT=${RESET_INT:-0}
 
     # 6. Auto Execute Script
@@ -175,14 +192,14 @@ setup_wizard() {
     msg "Auto-Execute Script"
     echo -e "${W}Configure Auto-Execute Script? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e AUTO_EXEC_OPT
+    read -r AUTO_EXEC_OPT
 
     if [[ "$AUTO_EXEC_OPT" =~ ^[Yy]$ ]]; then
         echo -e "${W}Select Executor:${N}"
         echo -e "1. Delta"
         echo -e "2. Fluxus"
         echo -ne "${Y}> ${N}" 
-        read -u 3 -e EXEC_SEL
+        read -r EXEC_SEL
         
         TARGET_DIR=""
         if [ "$EXEC_SEL" == "1" ]; then
@@ -199,12 +216,12 @@ setup_wizard() {
             
             echo -e "${W}Create one script for all? [y/n]${N}"
             echo -ne "${Y}> ${N}" 
-            read -u 3 -e CREATE_SCRIPT
+            read -r CREATE_SCRIPT
             
             if [[ "$CREATE_SCRIPT" =~ ^[Yy]$ ]]; then
                 echo -e "${W}Paste script content (Type 'END' on new line to finish):${N}"
                 SCRIPT_CONTENT=""
-                while IFS= read -u 3 -e line; do
+                while IFS= read -r line; do
                     [ "$line" == "END" ] && break
                     SCRIPT_CONTENT+="$line"$'\n'
                 done
@@ -255,7 +272,7 @@ setup_wizard() {
 
     success "Configuration Saved!"
     echo -e "${W}Press Enter to return...${N}" 
-    read -u 3 -e dummy
+    read -r dummy
 }
 
 # Edit Configuration Sub-Menu
@@ -287,7 +304,7 @@ edit_config_menu() {
         echo -e "${C}4.${W} Back to Main Menu"
         echo -e "${C}------------------------------${N}"
         echo -ne "${Y}Select [1-4]: ${N}" 
-        read -u 3 -e SUB_OPT
+        read -r SUB_OPT
 
         case $SUB_OPT in
             1) # View Packages
@@ -312,7 +329,7 @@ edit_config_menu() {
                 echo -e "1. Delta"
                 echo -e "2. Fluxus"
                 echo -ne "${Y}> ${N}" 
-                read -u 3 -e EXEC_SEL
+                read -r EXEC_SEL
                 
                 TARGET_DIR=""
                 if [ "$EXEC_SEL" == "1" ]; then
@@ -331,15 +348,15 @@ edit_config_menu() {
                     echo -e "${W}[1] Create New Script${N}"
                     echo -e "${W}[2] Delete All Scripts in Folder${N}"
                     echo -ne "${Y}> ${N}" 
-                    read -u 3 -e ACTION
+                    read -r ACTION
                     
                     if [ "$ACTION" == "1" ]; then
                         echo -e "${W}Filename (e.g. script.txt):${N}"
                         echo -ne "${Y}> ${N}" 
-                        read -u 3 -e FNAME
+                        read -r FNAME
                         echo -e "${W}Paste content (END to finish):${N}"
                         CONTENT=""
-                        while IFS= read -u 3 -e line; do
+                        while IFS= read -r line; do
                             [ "$line" == "END" ] && break
                             CONTENT+="$line"$'\n'
                         done
@@ -363,7 +380,7 @@ edit_config_menu() {
             *) error "Invalid Option" ;;
         esac
         echo -e "${W}Press Enter to continue...${N}" 
-        read -u 3 -e dummy
+        read -r dummy
     done
 }
 
@@ -377,7 +394,7 @@ while true; do
     echo -e "${C}5.${W} Exit"
     echo -e "${C}------------------------------${N}"
     echo -ne "${Y}Select [1-5]: ${N}" 
-    read -u 3 -e OPT
+    read -r OPT
 
     case $OPT in
         1) setup_wizard ;;
@@ -387,7 +404,7 @@ while true; do
             else
                 error "Config not found! Run Setup first."
                 echo -e "${W}Press Enter...${N}" 
-                read -u 3 -e dummy
+                read -r dummy
             fi
             ;;
         3) 
@@ -396,7 +413,7 @@ while true; do
             else
                 error "run.sh not found!"
                 echo -e "${W}Press Enter...${N}" 
-                read -u 3 -e dummy
+                read -r dummy
             fi
             ;;
         4)
