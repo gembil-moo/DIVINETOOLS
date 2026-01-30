@@ -1,127 +1,149 @@
 #!/bin/bash
-# DIVINETOOLS Installer - FIXED FORMAT VERSION
 
-echo "[*] Setting up DIVINETOOLS environment..."
-echo "[*] Working directory: $(pwd)"
+# DIVINETOOLS Installer - Professional Version
 
-# FUNGSI PRINT DENGAN FORMAT KONSISTEN
-print_info() { echo "[*] $1"; }
-print_ok() { echo "[+] $1"; }
-print_warn() { echo "[!] $1"; }
-print_error() { echo "[ERROR] $1"; }
+# --- 1. UI & Logging ---
+# ANSI Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# Check if running in Termux
+print_info() { echo -e "${BLUE}[INFO] $1${NC}"; }
+print_ok() { echo -e "${GREEN}[OK] $1${NC}"; }
+print_warn() { echo -e "${YELLOW}[WARN] $1${NC}"; }
+print_error() { echo -e "${RED}[ERROR] $1${NC}"; }
+
+echo -e "${BLUE}"
+echo "========================================"
+echo "       DIVINETOOLS INSTALLER v2.0       "
+echo "========================================"
+echo -e "${NC}"
+
+# --- 2. Environment Checks ---
 if [ -z "$TERMUX_VERSION" ]; then
-    print_warn "This script is designed for Termux"
-    read -p "Continue anyway? (y/n): " -n 1 -r
+    print_warn "You are not running inside Termux!"
+    read -p "Do you want to continue anyway? (y/n): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_error "Installation aborted."
         exit 1
     fi
+else
+    print_info "Termux environment detected."
+    print_info "Requesting storage access..."
+    termux-setup-storage
+    sleep 2
 fi
 
-# Check dependencies
-print_info "Checking dependencies..."
-for cmd in curl wget git; do
-    if ! command -v $cmd &> /dev/null; then
-        print_warn "Installing $cmd..."
-        pkg install -y $cmd 2>/dev/null || apt-get install -y $cmd 2>/dev/null
+# --- 3. System Update & Dependencies ---
+print_info "Updating system packages..."
+pkg update -y && pkg upgrade -y
+
+DEPENDENCIES=("lua53" "luarocks" "python" "make" "clang" "busybox" "coreutils" "ncurses-utils" "figlet")
+CRITICAL_DEPENDENCIES=("tsu" "android-tools" "jq")
+
+print_info "Installing dependencies..."
+
+# Install Standard Dependencies
+for pkg in "${DEPENDENCIES[@]}"; do
+    print_info "Installing $pkg..."
+    pkg install -y "$pkg" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        print_ok "$pkg installed."
+    else
+        print_warn "Failed to install $pkg. Attempting to continue..."
     fi
 done
 
-# Request storage permission (Termux)
-if [ -n "$TERMUX_VERSION" ]; then
-    print_info "Requesting storage access..."
-    termux-setup-storage
+# Install Critical Dependencies
+for pkg in "${CRITICAL_DEPENDENCIES[@]}"; do
+    print_info "Installing CRITICAL package: $pkg..."
+    pkg install -y "$pkg" > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        print_error "Critical dependency '$pkg' failed to install!"
+        exit 1
+    else
+        print_ok "$pkg installed."
+    fi
+done
+
+# --- 4. Lua Module Fix (Termux Fix) ---
+print_info "Configuring Lua environment..."
+
+# Export include path for Lua 5.3 headers
+if [ -d "$PREFIX/include/lua5.3" ]; then
+    export C_INCLUDE_PATH=$PREFIX/include/lua5.3:$C_INCLUDE_PATH
+    print_ok "Exported C_INCLUDE_PATH for Lua 5.3"
+else
+    print_warn "Lua 5.3 include directory not found. Compilation might fail."
 fi
 
-# Update system
-print_info "Updating package lists..."
-pkg update -y && pkg upgrade -y
-# Install system packages
-print_info "Installing required packages..."
-pkg install -y \
-    lua53 \
-    luarocks \
-    python \
-    tsu \
-    figlet \
-    toilet \
-    ncurses-utils \
-    android-tools \
-    coreutils \
-    zip \
-    unzip \
-    jq
+# Install Lua Modules
+print_info "Installing Lua modules via LuaRocks..."
+luarocks --lua-version=5.3 install lua-cjson
+if [ $? -eq 0 ]; then print_ok "lua-cjson installed."; else print_warn "lua-cjson failed."; fi
 
-# Dependensi untuk build C module (seperti cjson)
-print_info "Installing build dependencies..."
-pkg install -y make clang
+luarocks --lua-version=5.3 install luasocket
+if [ $? -eq 0 ]; then print_ok "luasocket installed."; else print_warn "luasocket failed."; fi
 
-# Install Lua modules
-print_info "Installing Lua modules..."
-luarocks install lua-cjson || print_error "Failed to install lua-cjson. Coba 'pkg install -y make clang'."
-luarocks install luasocket || print_warn "Failed to install luasocket"
-
-# Install Python libraries
-print_info "Installing Python packages..."
+# --- 5. Python Setup ---
+print_info "Setting up Python environment..."
 if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt || print_warn "Failed to install Python packages from requirements.txt"
+    print_info "Installing from requirements.txt..."
+    pip install -r requirements.txt
 else
-    print_warn "requirements.txt not found"
+    print_info "requirements.txt not found. Installing default libraries..."
     pip install pyfiglet rich
 fi
 
-# Create necessary directories
-print_info "Creating directory structure..."
-mkdir -p config logs scripts/autoexec scripts/divine src/modules
+# --- 6. Project Structure ---
+print_info "Creating project directories..."
+mkdir -p config logs src/modules workspace
+print_ok "Directories created: config, logs, src/modules, workspace"
 
-# Set permissions
-print_info "Setting permissions..."
-if [ -f "run.sh" ]; then
-    chmod +x run.sh
-    print_ok "run.sh permissions set"
+print_info "Setting file permissions..."
+chmod +x *.sh 2>/dev/null
+print_ok "Executable permissions set for .sh files."
+
+# --- 7. Root Verification ---
+print_info "Checking Root Access..."
+if command -v tsu >/dev/null 2>&1 && tsu -c true > /dev/null 2>&1; then
+    print_ok "Root access granted."
 else
-    print_warn "run.sh not found"
+    print_warn "ROOT ACCESS NOT DETECTED!"
+    print_warn "Device Optimizer features (Swap, CPU Boost, Auto-Kill) will NOT work."
+    print_warn "The tool will run in Limited Mode."
 fi
 
-if [ -f "install.sh" ]; then
-    chmod +x install.sh
-    print_ok "install.sh permissions set"
-fi
-
-# Check for root access - FORMAT INI YANG DIPERBAIKI
-if timeout 1 su -c "echo 'Root check'" &>/dev/null; then
-    print_ok "Root access available"
-else
-    print_warn "Root access not available. Some features may be limited."
-fi
-
-# Create example config if not exists
-if [ ! -f "config/config.json" ] && [ -f "config.example.json" ]; then
+# --- 8. Configuration Logic ---
+print_info "Checking configuration..."
+if [ -f "config/config.json" ]; then
+    print_ok "Config file exists."
+elif [ -f "config.example.json" ]; then
+    print_info "Copying example config..."
     cp config.example.json config/config.json
-    print_ok "Created default config"
-elif [ ! -f "config/config.json" ]; then
-    print_info "Creating minimal config..."
-    mkdir -p config
-    cat > config/config.json << 'CONFIG_EOF'
+    print_ok "Config created from example."
+else
+    print_warn "No config found. Generating minimal config..."
+    cat > config/config.json <<EOF
 {
-    "version": "2.0.0",
-    "first_run": true,
-    "log_level": "info"
+    "version": "2.0",
+    "package_name": "com.roblox.client",
+    "swap_size_gb": 2,
+    "private_server": ""
 }
-CONFIG_EOF
-    print_ok "Created minimal config"
+EOF
+    print_ok "Minimal config.json generated."
 fi
 
-# OUTPUT FINAL - SEMUA SEJALAR KIRI
+# --- 9. Final Output ---
 echo ""
-print_ok "Installation complete!"
-print_ok "Run with: ./run.sh"
+echo -e "${GREEN}========================================"
+echo -e "      INSTALLATION SUCCESSFUL!          "
+echo -e "========================================${NC}"
 echo ""
-echo "Next steps:"
-echo "1. Edit config/config.json if needed"
-echo "2. Run: ./run.sh"
-echo "3. Select 'First Configuration' in menu"
+echo -e "To start the tool, run:"
+echo -e "${YELLOW}bash run.sh${NC}"
 echo ""
-print_info "Installation finished at: $(date)"
