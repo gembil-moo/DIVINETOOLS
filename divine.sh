@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 5.4 (Redfinger Fix)
+# Version 5.5 (Safe Input Mode)
 
 # Colors
 C='\033[1;36m' # Cyan
@@ -16,12 +16,12 @@ mkdir -p config
 header() {
     clear
     echo -e "${C}"
-    echo "   ___  _____    _(_)___  ___ "
+    echo "   ___  _____    _(_)___  ___"
     echo "  / _ \/  _/ |  / / / _ \/ _ \\"
     echo " / // // / | | / / / // /  __/"
-    echo "/____/___/ |___/_/_//_/\___/ "
+    echo "/____/___/ |___/_/_/_//_/\\___/"
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v5.4 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v5.5 ===${N}"
     echo ""
 }
 
@@ -47,13 +47,15 @@ setup_wizard() {
     # 1. Package Detection
     msg "Package Detection"
     echo -e "${W}Auto Detect [a] or Manual [m]?${N}"
-    read -r -p "> " PKG_OPT < /dev/tty
+    echo -ne "> "
+    read -r PKG_OPT
     PKG_OPT=${PKG_OPT:-a}
 
     PACKAGES=()
     if [[ "$PKG_OPT" =~ ^[Mm]$ ]]; then
         echo -e "${W}Enter package names (space separated):${N}"
-        read -r -p "> " MANUAL_PKGS < /dev/tty
+        echo -ne "> "
+        read -r MANUAL_PKGS
         IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
     else
         msg "Scanning..."
@@ -65,7 +67,8 @@ setup_wizard() {
         if [ ${#PACKAGES[@]} -eq 0 ]; then
             error "No packages found!"
             echo -e "${W}Enter manually:${N}"
-            read -p "> " MANUAL_PKGS < /dev/tty
+            echo -ne "> "
+            read MANUAL_PKGS
             IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
         else
             success "Found ${#PACKAGES[@]} packages."
@@ -76,7 +79,8 @@ setup_wizard() {
     echo ""
     msg "Private Servers"
     echo -e "${W}Use 1 Private Link for ALL accounts? [y/n]${N}"
-    read -r -p "> " ONE_LINK < /dev/tty
+    echo -ne "> "
+    read -r ONE_LINK
 
     PS_MODE="per_package"
     PS_URL=""
@@ -85,7 +89,8 @@ setup_wizard() {
     if [[ "$ONE_LINK" =~ ^[Yy]$ ]]; then
         PS_MODE="same"
         echo -e "${W}Enter VIP Link:${N}"
-        read -r -p "> " PS_URL < /dev/tty
+        echo -ne "> "
+        read -r PS_URL
     else
         # Fix: Use for loop instead of while read to ensure user input works
         for pkg in "${PACKAGES[@]}"; do
@@ -94,7 +99,8 @@ setup_wizard() {
                 local display="$pkg"
                 [ -n "$user" ] && display="$pkg ($user)"
                 echo -e "${W}Link for $display:${N}"
-                read -r -p "> " LINK < /dev/tty
+                echo -ne "> "
+                read -r LINK
                 PS_URLS["$pkg"]="$LINK"
             fi
         done
@@ -104,7 +110,8 @@ setup_wizard() {
     echo ""
     msg "Dashboard Settings"
     echo -e "${W}Mask Usernames in Dashboard? (e.g. DIxxxNE) [y/n]${N}"
-    read -p "> " MASK_OPT < /dev/tty
+    echo -ne "> "
+    read MASK_OPT
     MASKING=false
     [[ "$MASK_OPT" =~ ^[Yy]$ ]] && MASKING=true
 
@@ -112,7 +119,8 @@ setup_wizard() {
     echo ""
     msg "Webhook Settings"
     echo -e "${W}Enable Webhook? [y/n]${N}"
-    read -p "> " WH_OPT < /dev/tty
+    echo -ne "> "
+    read WH_OPT
     
     WH_ENABLED=false
     WH_URL=""
@@ -122,15 +130,18 @@ setup_wizard() {
     if [[ "$WH_OPT" =~ ^[Yy]$ ]]; then
         WH_ENABLED=true
         echo -e "${W}Webhook URL:${N}"
-        read -p "> " WH_URL < /dev/tty
+        echo -ne "> "
+        read WH_URL
         
         echo -e "${W}Mode (1. Send New, 2. Edit):${N}"
-        read -p "> " WH_MODE_OPT < /dev/tty
+        echo -ne "> "
+        read WH_MODE_OPT
         [[ "$WH_MODE_OPT" == "2" ]] && WH_MODE="edit"
 
         while true; do
             echo -e "${W}Interval (min 5 mins):${N}"
-            read -p "> " WH_INTERVAL < /dev/tty
+            echo -ne "> "
+            read WH_INTERVAL
             if [[ "$WH_INTERVAL" =~ ^[0-9]+$ ]] && [ "$WH_INTERVAL" -ge 5 ]; then
                 break
             else
@@ -143,25 +154,29 @@ setup_wizard() {
     echo ""
     msg "Timing Settings"
     echo -e "${W}Launch Delay (seconds)? (Default 30)${N}"
-    read -p "> " LAUNCH_DELAY < /dev/tty
+    echo -ne "> "
+    read LAUNCH_DELAY
     LAUNCH_DELAY=${LAUNCH_DELAY:-30}
     if [ "$LAUNCH_DELAY" -lt 30 ]; then LAUNCH_DELAY=30; fi
 
     echo -e "${W}Reset Interval (minutes)? (0=Off)${N}"
-    read -p "> " RESET_INT < /dev/tty
+    echo -ne "> "
+    read RESET_INT
     RESET_INT=${RESET_INT:-0}
 
     # 6. Auto Execute Script
     echo ""
     msg "Auto-Execute Script"
     echo -e "${W}Configure Auto-Execute Script? [y/n]${N}"
-    read -p "> " AUTO_EXEC_OPT < /dev/tty
+    echo -ne "> "
+    read AUTO_EXEC_OPT
 
     if [[ "$AUTO_EXEC_OPT" =~ ^[Yy]$ ]]; then
         echo -e "${W}Select Executor:${N}"
         echo -e "1. Delta"
         echo -e "2. Fluxus"
-        read -p "> " EXEC_SEL < /dev/tty
+        echo -ne "> "
+        read EXEC_SEL
         
         TARGET_DIR=""
         if [ "$EXEC_SEL" == "1" ]; then
@@ -179,7 +194,8 @@ setup_wizard() {
             SCRIPT_IDX=1
             while true; do
                 echo -e "${W}Create script_${SCRIPT_IDX}.txt? [y/n]${N}"
-                read -p "> " CREATE_SCRIPT < /dev/tty
+                echo -ne "> "
+                read CREATE_SCRIPT
                 if [[ ! "$CREATE_SCRIPT" =~ ^[Yy]$ ]]; then break; fi
 
                 echo -e "${W}Paste script content (Type 'END' on new line to finish):${N}"
@@ -187,7 +203,7 @@ setup_wizard() {
                 while IFS= read -r line; do
                     [ "$line" == "END" ] && break
                     SCRIPT_CONTENT+="$line"$'\n'
-                done < /dev/tty
+                done
 
                 FILE_PATH="$TARGET_DIR/script_${SCRIPT_IDX}.txt"
                 TMP=$(mktemp)
@@ -235,7 +251,8 @@ setup_wizard() {
         > "$CONFIG_FILE"
 
     success "Configuration Saved!"
-    read -p "Press Enter to return..." < /dev/tty
+    echo -ne "Press Enter to return..."
+    read
 }
 
 # Edit Configuration Sub-Menu
@@ -269,7 +286,8 @@ edit_config_menu() {
         echo -e "${C}6.${W} View Full Configuration"
         echo -e "${C}7.${W} Back to Main Menu"
         echo -e "${C}------------------------------${N}"
-        read -p "Select [1-7]: " SUB_OPT < /dev/tty
+        echo -ne "Select [1-7]: "
+        read SUB_OPT
 
         case $SUB_OPT in
             1) # Edit Packages
@@ -278,11 +296,13 @@ edit_config_menu() {
                 jq -r '.packages[]' "$CONFIG_FILE" | nl
                 echo ""
                 echo -e "${W}Options: [a] Add, [r] Remove, [c] Clear All, [b] Back${N}"
-                read -p "> " PKG_ACTION < /dev/tty
+                echo -ne "> "
+                read PKG_ACTION
                 
                 if [[ "$PKG_ACTION" == "a" ]]; then
                     echo -e "${W}Enter package name to add:${N}"
-                    read -p "> " NEW_PKG < /dev/tty
+                    echo -ne "> "
+                    read NEW_PKG
                     if [ -n "$NEW_PKG" ]; then
                         TMP=$(mktemp)
                         jq --arg pkg "$NEW_PKG" '.packages += [$pkg]' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
@@ -290,7 +310,8 @@ edit_config_menu() {
                     fi
                 elif [[ "$PKG_ACTION" == "r" ]]; then
                     echo -e "${W}Enter index to remove (1-based):${N}"
-                    read -p "> " IDX < /dev/tty
+                    echo -ne "> "
+                    read IDX
                     if [[ "$IDX" =~ ^[0-9]+$ ]]; then
                         TMP=$(mktemp)
                         jq "del(.packages[$(($IDX-1))])" "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
@@ -306,14 +327,17 @@ edit_config_menu() {
                 msg "Edit Private Servers"
                 echo -e "${W}Current Mode: $PS_MODE${N}"
                 echo -e "${W}Change Mode? [y/n]${N}"
-                read -p "> " CHG_MODE < /dev/tty
+                echo -ne "> "
+                read CHG_MODE
                 
                 if [[ "$CHG_MODE" =~ ^[Yy]$ ]]; then
                     echo -e "${W}Use 1 Link for ALL? [y/n]${N}"
-                    read -p "> " ONE_LINK < /dev/tty
+                    echo -ne "> "
+                    read ONE_LINK
                     if [[ "$ONE_LINK" =~ ^[Yy]$ ]]; then
                         echo -e "${W}Enter VIP Link:${N}"
-                        read -p "> " URL < /dev/tty
+                        echo -ne "> "
+                        read URL
                         TMP=$(mktemp)
                         jq --arg url "$URL" '.private_servers.mode = "same" | .private_servers.url = $url' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
                     else
@@ -340,16 +364,20 @@ edit_config_menu() {
             3) # Edit Webhook
                 msg "Edit Webhook"
                 echo -e "${W}Enable Webhook? [y/n]${N}"
-                read -p "> " WH_OPT < /dev/tty
+                echo -ne "> "
+                read WH_OPT
                 if [[ "$WH_OPT" =~ ^[Yy]$ ]]; then
                     echo -e "${W}URL:${N}"
-                    read -p "> " URL < /dev/tty
+                    echo -ne "> "
+                    read URL
                     echo -e "${W}Mode (1.New/2.Edit):${N}"
-                    read -p "> " M_OPT < /dev/tty
+                    echo -ne "> "
+                    read M_OPT
                     MODE="new"
                     [[ "$M_OPT" == "2" ]] && MODE="edit"
                     echo -e "${W}Interval (min):${N}"
-                    read -p "> " INT < /dev/tty
+                    echo -ne "> "
+                    read INT
                     
                     TMP=$(mktemp)
                     jq --arg url "$URL" --arg mode "$MODE" --argjson int "$INT" \
@@ -363,15 +391,18 @@ edit_config_menu() {
             4) # Other Settings
                 msg "Edit Other Settings"
                 echo -e "${W}Mask Usernames? [y/n]${N}"
-                read -p "> " MASK < /dev/tty
+                echo -ne "> "
+                read MASK
                 MASK_BOOL=false
                 [[ "$MASK" =~ ^[Yy]$ ]] && MASK_BOOL=true
                 
                 echo -e "${W}Launch Delay (s):${N}"
-                read -p "> " DELAY < /dev/tty
+                echo -ne "> "
+                read DELAY
                 
                 echo -e "${W}Reset Interval (m):${N}"
-                read -p "> " RESET < /dev/tty
+                echo -ne "> "
+                read RESET
                 
                 TMP=$(mktemp)
                 jq --argjson mask $MASK_BOOL --argjson delay "$DELAY" --argjson reset "$RESET" \
@@ -383,7 +414,8 @@ edit_config_menu() {
                 echo -e "${W}Select Executor:${N}"
                 echo -e "1. Delta"
                 echo -e "2. Fluxus"
-                read -p "> " EXEC_SEL < /dev/tty
+                echo -ne "> "
+                read EXEC_SEL
                 
                 TARGET_DIR=""
                 if [ "$EXEC_SEL" == "1" ]; then
@@ -401,17 +433,19 @@ edit_config_menu() {
                     
                     echo -e "${W}[1] Create New Script${N}"
                     echo -e "${W}[2] Delete All Scripts in Folder${N}"
-                    read -p "> " ACTION < /dev/tty
+                    echo -ne "> "
+                    read ACTION
                     
                     if [ "$ACTION" == "1" ]; then
                         echo -e "${W}Filename (e.g. script.txt):${N}"
-                        read -p "> " FNAME < /dev/tty
+                        echo -ne "> "
+                        read FNAME
                         echo -e "${W}Paste content (END to finish):${N}"
                         CONTENT=""
                         while IFS= read -r line; do
                             [ "$line" == "END" ] && break
                             CONTENT+="$line"$'\n'
-                        done < /dev/tty
+                        done
                         
                         FILE_PATH="$TARGET_DIR/$FNAME"
                         TMP=$(mktemp)
@@ -431,12 +465,14 @@ edit_config_menu() {
             6) # View Full Config
                 msg "Full Configuration"
                 jq '.' "$CONFIG_FILE"
-                read -p "Press Enter..." < /dev/tty
+                echo -ne "Press Enter..."
+                read
                 ;;
             7) return ;;
             *) error "Invalid Option" ;;
         esac
-        read -p "Press Enter to continue..." < /dev/tty
+        echo -ne "Press Enter to continue..."
+        read
     done
 }
 
@@ -449,7 +485,8 @@ while true; do
     echo -e "${C}4.${W} Clear All App Caches"
     echo -e "${C}5.${W} Exit"
     echo -e "${C}------------------------------${N}"
-    read -p "Select [1-5]: " OPT < /dev/tty
+    echo -ne "Select [1-5]: "
+    read OPT
 
     case $OPT in
         1) setup_wizard ;;
@@ -458,7 +495,8 @@ while true; do
                 edit_config_menu
             else
                 error "Config not found! Run Setup first."
-                read -p "Press Enter..." < /dev/tty
+                echo -ne "Press Enter..."
+                read
             fi
             ;;
         3) 
@@ -466,7 +504,8 @@ while true; do
                 bash run.sh
             else
                 error "run.sh not found!"
-                read -p "Press Enter..." < /dev/tty
+                echo -ne "Press Enter..."
+                read
             fi
             ;;
         4)
