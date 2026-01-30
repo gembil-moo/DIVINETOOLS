@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - COMPACT MENU
-# Version 3.2
+# Version 4.2
 
 # --- COLORS ---
 C='\033[1;36m' # Cyan
@@ -22,7 +22,7 @@ header() {
     echo "  ██║  ██║██║╚██╗ ██╔╝██║██║╚██╗██║██╔══╝  "
     echo "  ██████╔╝██║ ╚████╔╝ ██║██║ ╚████║███████╗"
     echo "  ╚═════╝ ╚═╝  ╚═══╝  ╚═╝╚═╝  ╚═══╝╚══════╝"
-    echo -e "       ${W}PREMIUM AUTOMATION TOOL${N}"
+    echo -e "           ${C}DIVINE TOOLS v4.2${N}"
     echo -e "${C}=============================================${N}"
 }
 
@@ -84,30 +84,41 @@ setup() {
 
     # 4. Auto-Execute
     echo ""
-    msg "Auto-Execute (Delta)"
-    echo -e "${W}Inject script? [y/n]${N}"
+    msg "Auto-Execute Setup"
+    echo -e "${W}Inject Auto-Execute Script? [y/n]${N}"
     read -p "> " INJECT
 
     if [[ "$INJECT" =~ ^[Yy]$ ]]; then
-        echo -e "${W}Paste script (Type END on new line):${N}"
-        SCRIPT=""
-        while IFS= read -r line; do
-            [ "$line" == "END" ] && break
-            SCRIPT+="$line"$'\n'
-        done
+        echo -e "${W}Select Executor:${N}"
+        echo -e "  1. Delta (/sdcard/Delta/Autoexecute)"
+        echo -e "  2. Fluxus (/sdcard/FluxusZ/autoexec)"
+        echo -e "  3. Custom Path"
+        read -p "> " EXEC_OPT
 
-        msg "Injecting..."
-        for pkg in "${PACKAGES[@]}"; do
-            DIR="/sdcard/Android/data/$pkg/files/Delta/Autoexecute"
-            FILE="$DIR/script.txt"
-            
-            su -c "mkdir -p $DIR"
+        TARGET_DIR=""
+        case $EXEC_OPT in
+            1) TARGET_DIR="/sdcard/Delta/Autoexecute" ;;
+            2) TARGET_DIR="/sdcard/FluxusZ/autoexec" ;;
+            3) read -p "Enter full path: " TARGET_DIR ;;
+            *) error "Invalid option."; TARGET_DIR="" ;;
+        esac
+
+        if [ -n "$TARGET_DIR" ]; then
+            echo -e "${W}Paste script (Type END on new line):${N}"
+            SCRIPT=""
+            while IFS= read -r line; do
+                [ "$line" == "END" ] && break
+                SCRIPT+="$line"$'\n'
+            done
+
+            msg "Saving script..."
+            su -c "mkdir -p $TARGET_DIR"
             TMP=$(mktemp)
             echo "$SCRIPT" > "$TMP"
-            cat "$TMP" | su -c "cat > $FILE"
+            cat "$TMP" | su -c "cat > $TARGET_DIR/divine_script.txt"
             rm "$TMP"
-            success "Injected to $pkg"
-        done
+            success "Saved to $TARGET_DIR/divine_script.txt"
+        fi
     fi
 
     # 5. Save Config

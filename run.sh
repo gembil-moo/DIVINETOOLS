@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - ENGINE & DASHBOARD
-# Version 4.3 (Kaeru Style)
+# Version 4.4 (Advanced Grid)
 
 # --- COLORS ---
 C='\033[1;36m' # Cyan
@@ -33,6 +33,57 @@ if [ "$TOTAL" -eq 0 ]; then
     exit 1
 fi
 
+# --- UTILS: SCREEN & GRID ---
+get_screen_size() {
+    # Default to 720x1280 if detection fails
+    SCREEN_WIDTH=720
+    SCREEN_HEIGHT=1280
+    
+    if command -v wm >/dev/null; then
+        local size_str=$(wm size | grep "Physical size" | awk '{print $3}')
+        if [[ "$size_str" =~ ([0-9]+)x([0-9]+) ]]; then
+            SCREEN_WIDTH=${BASH_REMATCH[1]}
+            SCREEN_HEIGHT=${BASH_REMATCH[2]}
+        fi
+    fi
+}
+
+calculate_bounds() {
+    local idx=$1 # 0-based index
+    local total=$2
+    local w=$SCREEN_WIDTH
+    local h=$SCREEN_HEIGHT
+    
+    # Determine Grid Layout based on Total Accounts
+    local cols=1
+    local rows=1
+    
+    if [ "$total" -le 2 ]; then
+        cols=1; rows=2
+    elif [ "$total" -le 4 ]; then
+        cols=2; rows=2
+    elif [ "$total" -le 6 ]; then
+        cols=2; rows=3
+    else
+        cols=3; rows=3
+    fi
+    
+    # Calculate Cell Size
+    local cell_w=$((w / cols))
+    local cell_h=$((h / rows))
+    
+    # Calculate Position
+    local col_idx=$((idx % cols))
+    local row_idx=$((idx / cols))
+    
+    local left=$((col_idx * cell_w))
+    local top=$((row_idx * cell_h))
+    local right=$((left + cell_w))
+    local bottom=$((top + cell_h))
+    
+    echo "${left},${top},${right},${bottom}"
+}
+
 # --- SYSTEM OPTIMIZATION ---
 setup_environment() {
     # 1. Swap Manager
@@ -54,12 +105,11 @@ setup_environment() {
 
 # --- LAUNCHER LOGIC ---
 launch_sequence() {
-    echo -e "${C}[*] Launching $TOTAL Accounts...${N}"
+    get_screen_size
+    echo -e "${C}[*] Screen: ${SCREEN_WIDTH}x${SCREEN_HEIGHT} | Grid Mode${N}"
     
     local idx=0
     for pkg in "${PACKAGES[@]}"; do
-        ((idx++))
-        
         # Get Link
         local link=""
         if [ "$PS_MODE" == "same" ]; then
@@ -68,17 +118,21 @@ launch_sequence() {
             link=$(jq -r --arg p "$pkg" '.private_servers.urls[$p] // ""' "$CONF_FILE")
         fi
         
+        # Calculate Bounds
+        local bounds=$(calculate_bounds $idx $TOTAL)
+        
         # Kill App
         su -c "am force-stop $pkg" >/dev/null 2>&1
         
-        # Launch Freeform (Window Mode 5)
-        local cmd="am start -n $pkg/com.roblox.client.Activity --windowingMode 5"
+        # Launch Freeform with Bounds
+        local cmd="am start -n $pkg/com.roblox.client.Activity --windowingMode 5 --bounds $bounds"
         if [ -n "$link" ] && [ "$link" != "null" ]; then
              cmd="$cmd -a android.intent.action.VIEW -d \"$link\""
         fi
         
         su -c "$cmd" >/dev/null 2>&1
         
+        ((idx++))
         sleep "$DELAY"
     done
 }
@@ -87,52 +141,55 @@ launch_sequence() {
 draw_dashboard() {
     while true; do
         clear
-        # 1. HEADER (Kaeru Style)
-        echo -e "${C}"
-        echo "  ██████╗ ██╗██╗   ██╗██╗███╗   ██╗███████╗"
-        echo "  ██╔══██╗██║██║   ██║██║████╗  ██║██╔════╝"
-        echo "  ██║  ██║██║██║   ██║██║██╔██╗ ██║█████╗  "
-        echo "  ██║  ██║██║╚██╗ ██╔╝██║██║╚██╗██║██╔══╝  "
-        echo "  ██████╔╝██║ ╚████╔╝ ██║██║ ╚████║███████╗"
-        echo "  ╚═════╝ ╚═╝  ╚═══╝  ╚═╝╚═╝  ╚═══╝╚══════╝"
-        echo -e "       ${W}PREMIUM AUTOMATION TOOL${N}"
-        echo ""
-
-        # 2. SYSTEM INFO
-        FREE_RAM=$(free -m | awk '/Mem:/ {print $4}')
-        echo -e "${W}System Memory: ${G}${FREE_RAM} MB Free${N}"
-        echo ""
+        # 1. MINI HEADER
+        echo -e "${C}=== DIVINE TOOLS v4 ===${N}"
         
-        # 3. THE TABLE
-        echo -e "${C}+----+----------------------+--------+${N}"
-        echo -e "${C}| NO | PACKAGE/CLONE        | STATUS |${N}"
-        echo -e "${C}+----+----------------------+--------+${N}"
-
-        local i=1
+        # 2. SYSTEM & MEMORY BOXES
+        # Get Memory Info
+        local mem_info=$(free -m | awk '/Mem:/ {print $2,$4}') # Total Free
+        read -r total_mem free_mem <<< "$mem_info"
+        
+        # Calculate Percentage
+        local mem_pct=0
+        if [ "$total_mem" -gt 0 ]; then
+            mem_pct=$(awk "BEGIN {printf \"%.0f\", ($free_mem/$total_mem)*100}")
+        fi
+        
+        # Count Online
+        local online_cnt=0
         for pkg in "${PACKAGES[@]}"; do
-            # Clone Name (Last part)
-            local clone_name="${pkg##*.}"
-            # Truncate to 20 chars to fit column width 22 (approx)
-            if [ ${#clone_name} -gt 20 ]; then clone_name="${clone_name:0:17}..."; fi
+            if pgrep -f "$pkg" >/dev/null; then ((online_cnt++)); fi
+        done
+        
+        # Draw Boxes (Width ~40)
+        echo -e "${C}+------------------+-------------------+${N}"
+        echo -e "${C}|${W} SYSTEM           ${C}|${W} MEMORY            ${C}|${N}"
+        printf "${C}|${W} Active: %-9s${C}|${W} Free: %-4sMB %3s%%${C}|${N}\n" "$online_cnt/$TOTAL" "$free_mem" "$mem_pct"
+        echo -e "${C}+------------------+-------------------+${N}"
+
+        # 3. THE TABLE (No Headers)
+        for pkg in "${PACKAGES[@]}"; do
+            # Truncate package name (last 15 chars)
+            local display_name="${pkg}"
+            if [ ${#display_name} -gt 15 ]; then
+                display_name="...${display_name: -15}"
+            fi
             
             # Check Status
-            local status_text="[OFF]"
+            local status_text="Offline"
             local status_color="${R}"
             if pgrep -f "$pkg" >/dev/null; then
-                status_text="[ON]"
+                status_text="Online "
                 status_color="${G}"
             fi
             
-            # Format: | NO | CLONE | STATUS |
-            # Widths: 2, 20, 6 (plus padding)
-            printf "${C}|${N} %-2d ${C}|${N} %-20s ${C}|${N} ${status_color}%-6s${N} ${C}|${N}\n" "$i" "$clone_name" "$status_text"
-            
-            ((i++))
+            # Format: | [pkg] | [Status] |
+            printf "${C}|${W} %-18s ${C}|${N} ${status_color}%-9s${N} ${C}|${N}\n" "$display_name" "$status_text"
         done
-        echo -e "${C}+----+----------------------+--------+${N}"
-        echo -e "\n${Y}Refreshing in 5s... (CTRL+C to Stop)${N}"
+        echo -e "${C}+--------------------------------------+${N}"
+        echo -e "\n${Y}Refreshing in 3s...${N}"
         
-        sleep 5
+        sleep 3
     done
 }
 
