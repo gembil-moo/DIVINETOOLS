@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 7.2 (Pkg Display Fix)
+# Version 7.3 (Global Variable Fix)
 
 # Redirect stdin to FD 3 to prevent read skipping in loops
 exec 3<&0
@@ -14,6 +14,9 @@ N='\033[0m'    # Reset
 
 CONFIG_FILE="config/config.json"
 mkdir -p config
+
+# Global Packages Array
+declare -g -a GLOBAL_PKGS=()
 
 # Initialize Config if missing
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -35,7 +38,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v7.2 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v7.3 ===${N}"
     echo ""
 }
 
@@ -65,36 +68,36 @@ configure_packages() {
     read -u 3 -e PKG_OPT
     PKG_OPT=${PKG_OPT:-a}
 
-    PACKAGES=()
+    GLOBAL_PKGS=()
     if [[ "$PKG_OPT" =~ ^[Mm]$ ]]; then
         echo -e "${W}Enter package names (space separated):${N}"
         echo -ne "${Y}> ${N}"
         read -u 3 -e MANUAL_PKGS
-        IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
+        IFS=' ' read -r -a GLOBAL_PKGS <<< "$MANUAL_PKGS"
     else
         msg "Scanning..."
         # Fix: Use command substitution to avoid pipe subshell issues with read later
         # Use array assignment directly
-        PACKAGES=($(pm list packages | grep roblox | cut -d: -f2))
+        GLOBAL_PKGS=($(pm list packages | grep roblox | cut -d: -f2))
         
-        if [ ${#PACKAGES[@]} -eq 0 ]; then
+        if [ ${#GLOBAL_PKGS[@]} -eq 0 ]; then
             error "No packages found!"
             echo -e "${W}Enter manually:${N}"
             echo -ne "${Y}> ${N}"
             read -u 3 -e MANUAL_PKGS
-            IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
+            IFS=' ' read -r -a GLOBAL_PKGS <<< "$MANUAL_PKGS"
         else
-            success "Found ${#PACKAGES[@]} packages."
+            success "Found ${#GLOBAL_PKGS[@]} packages."
             echo -e "${W}Detected Packages:${N}"
-            for i in "${!PACKAGES[@]}"; do
-                echo "  [$((i+1))] ${PACKAGES[$i]}"
+            for i in "${!GLOBAL_PKGS[@]}"; do
+                echo "  [$((i+1))] ${GLOBAL_PKGS[$i]}"
             done
         fi
     fi
 
     # Save Packages immediately
     TMP=$(mktemp)
-    jq --argjson pkgs "$(printf '%s\n' "${PACKAGES[@]}" | jq -R . | jq -s .)" '.packages = $pkgs' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+    jq --argjson pkgs "$(printf '%s\n' "${GLOBAL_PKGS[@]}" | jq -R . | jq -s .)" '.packages = $pkgs' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
     rm -f "$TMP"
 }
 
@@ -102,11 +105,19 @@ configure_links() {
     # 2. Private Server Links
     msg "Private Servers"
     
-    # Load packages from config to ensure we have the latest list
-    PACKAGES=()
-    while IFS= read -r line; do
-        [[ -n "$line" ]] && PACKAGES+=("$line")
-    done < <(jq -r '.packages[] // empty' "$CONFIG_FILE")
+    # Check if GLOBAL_PKGS is empty, if so try to load from config
+    if [ ${#GLOBAL_PKGS[@]} -eq 0 ]; then
+        GLOBAL_PKGS=()
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && GLOBAL_PKGS+=("$line")
+        done < <(jq -r '.packages[] // empty' "$CONFIG_FILE")
+    fi
+    
+    # If still empty, error out
+    if [ ${#GLOBAL_PKGS[@]} -eq 0 ]; then
+        error "No packages found to configure! Please add packages first."
+        return
+    fi
     
     echo -e "${W}Use 1 Private Link for ALL accounts? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
@@ -126,12 +137,7 @@ configure_links() {
         jq '.private_servers.mode = "per_package"' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
         rm -f "$TMP"
 
-        if [ ${#PACKAGES[@]} -eq 0 ]; then
-            error "No packages found to configure! Please add packages first."
-            return
-        fi
-
-        for pkg in "${PACKAGES[@]}"; do
+        for pkg in "${GLOBAL_PKGS[@]}"; do
             local user=$(get_username "$pkg")
             local display="$pkg"
             [ -n "$user" ] && display="$pkg ($user)"
