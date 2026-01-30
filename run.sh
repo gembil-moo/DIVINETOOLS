@@ -1,122 +1,157 @@
 #!/bin/bash
 
-# --- KONFIGURASI ---
-# Ganti dengan link Private Server Abang
-PRIVATE_SERVER="https://www.roblox.com/share?code=4aeaff16f909314387486bc9d29ed5d5&type=Server"
+# DIVINETOOLS Runner - Professional Version
 
-# Ganti sesuai nama package (contoh: com.roblox.client atau com.roblox.client.vip1)
-PACKAGE_NAME="com.roblox.client" 
+# --- 1. UI & Logging ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# Target Activity (Jantungnya Roblox)
-ACTIVITY_NAME="com.roblox.client.Activity"
+print_info() { echo -e "${BLUE}[INFO] $1${NC}"; }
+print_ok() { echo -e "${GREEN}[OK] $1${NC}"; }
+print_warn() { echo -e "${YELLOW}[WARN] $1${NC}"; }
+print_error() { echo -e "${RED}[ERROR] $1${NC}"; }
 
-# --- FUNGSI OPTIMASI ---
+# --- 2. Configuration Loading ---
+CONFIG_DIR="config"
+CONFIG_FILE="$CONFIG_DIR/config.json"
+EXAMPLE_CONFIG="config.example.json"
 
-# 1. Fungsi Swap File (Fitur "Dewa" buat Device Kentang)
-check_and_create_swap() {
-    echo "=== CEK VIRTUAL RAM (SWAP) ==="
-    if [ ! -f /data/swapfile ]; then
-        echo "[+] Membuat Swap File 2GB (Tunggu sebentar...)"
-        # Membuat file 2GB
-        su -c "dd if=/dev/zero of=/data/swapfile bs=1M count=2048"
+print_info "Loading configuration..."
+
+# Check dependencies
+if ! command -v jq &> /dev/null; then
+    print_error "jq is not installed. Please run install.sh first."
+    exit 1
+fi
+
+# Ensure config exists
+if [ ! -f "$CONFIG_FILE" ]; then
+    if [ -f "$EXAMPLE_CONFIG" ]; then
+        print_warn "Config not found. Creating from example..."
+        mkdir -p "$CONFIG_DIR"
+        cp "$EXAMPLE_CONFIG" "$CONFIG_FILE"
+        print_ok "Config created."
+    else
+        print_error "Config file not found and example missing!"
+        exit 1
+    fi
+fi
+
+# Parse Config using jq
+PACKAGE_NAME=$(jq -r '.package_name // "com.roblox.client"' "$CONFIG_FILE")
+ACTIVITY_NAME=$(jq -r '.activity_name // "com.roblox.client.Activity"' "$CONFIG_FILE")
+PRIVATE_SERVER=$(jq -r '.private_server_link // ""' "$CONFIG_FILE")
+ENABLE_SWAP=$(jq -r '.settings.enable_swap // false' "$CONFIG_FILE")
+SWAP_SIZE_MB=$(jq -r '.settings.swap_size_mb // 2048' "$CONFIG_FILE")
+ENABLE_BOOST=$(jq -r '.settings.enable_cpu_boost // false' "$CONFIG_FILE")
+REJOIN_DELAY=$(jq -r '.settings.rejoin_delay_seconds // 1800' "$CONFIG_FILE")
+
+print_ok "Target Package: $PACKAGE_NAME"
+print_ok "Rejoin Delay: ${REJOIN_DELAY}s"
+
+# --- 3. Feature: Virtual RAM (Swap Manager) ---
+setup_swap() {
+    if [ "$ENABLE_SWAP" != "true" ]; then return; fi
+
+    print_info "Checking Swap configuration..."
+    
+    # Check if swap file exists
+    if ! su -c "[ -f /data/swapfile ]"; then
+        print_warn "Creating ${SWAP_SIZE_MB}MB Swap File (This may take a moment)..."
+        su -c "dd if=/dev/zero of=/data/swapfile bs=1M count=$SWAP_SIZE_MB"
         su -c "mkswap /data/swapfile"
         su -c "chmod 600 /data/swapfile"
+        print_ok "Swap file created."
     fi
-    
-    # Cek apakah swap aktif
-    is_active=$(su -c "cat /proc/swaps | grep swapfile")
-    if [ -z "$is_active" ]; then
-        echo "[+] Mengaktifkan Swap..."
+
+    # Check if active
+    if ! su -c "grep -q '/data/swapfile' /proc/swaps"; then
+        print_info "Activating Swap..."
         su -c "swapon /data/swapfile"
-        # Paksa prioritas tinggi ke swap
-        su -c "echo 100 > /proc/sys/vm/swappiness" 
+        su -c "echo 100 > /proc/sys/vm/swappiness"
+        print_ok "Swap activated (Swappiness: 100)."
     else
-        echo "[OK] Swap File sudah aktif."
+        print_ok "Swap is already active."
     fi
 }
 
-# 2. Fungsi Boost Device Modern
-boost_device() {
-    echo "=== BOOSTING DEVICE ==="
-    
-    # Bersihkan Cache RAM
+# --- 4. Feature: Device Optimization ---
+optimize_device() {
+    if [ "$ENABLE_BOOST" != "true" ]; then return; fi
+
+    print_info "Optimizing device performance..."
+
+    # Clear RAM Cache
     su -c "sync; echo 3 > /proc/sys/vm/drop_caches"
     
-    # Kill Aplikasi Pengganggu (Bloatware)
-    # Tambahkan package lain di sini jika perlu
-    local bloatware=("com.android.chrome" "com.google.android.youtube" "com.facebook.katana" "com.instagram.android")
-    for app in "${bloatware[@]}"; do
-        su -c "am force-stop $app > /dev/null 2>&1"
-    done
-    
-    # LMK Tweak (Settingan Modern untuk 4GB+ RAM)
-    # Format: VeryLow,Low,Normal,High,Critical,Die
-    # Kita set angka tinggi biar Android galak bunuh background app
-    echo "[+] Tuning Low Memory Killer..."
-    su -c "echo '18432,23040,27648,32256,55296,80640' > /sys/module/lowmemorykiller/parameters/minfree"
-    
-    # CPU Performance Mode
-    echo "[+] Set CPU ke Mode Tempur..."
+    # CPU Governor -> Performance
     for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-        if [ -f "$cpu" ]; then
-            su -c "echo 'performance' > $cpu"
-        fi
+        su -c "echo performance > $cpu" 2>/dev/null
     done
+    
+    # Aggressive LMK (Low Memory Killer) for 4GB+ RAM
+    # Values: 72MB, 90MB, 108MB, 126MB, 216MB, 315MB
+    local lmk_values="18432,23040,27648,32256,55296,80640"
+    su -c "echo '$lmk_values' > /sys/module/lowmemorykiller/parameters/minfree" 2>/dev/null
+    
+    print_ok "RAM cleared & CPU boosted."
 }
 
-# 3. Fungsi Launch Pintar (Bypass Browser)
+# --- 5. Feature: Direct Launcher ---
 launch_roblox() {
-    echo "=== MELUNCURKAN ROBLOX ==="
+    print_info "Launching Roblox..."
     
-    # Pastikan app mati dulu biar fresh (cegah memory leak)
+    # Force Stop
     su -c "am force-stop $PACKAGE_NAME"
     sleep 1
     
-    echo "[+] Injecting Link Server..."
+    # Construct Command
+    local cmd="am start -n $PACKAGE_NAME/$ACTIVITY_NAME"
+    if [ -n "$PRIVATE_SERVER" ] && [ "$PRIVATE_SERVER" != "null" ]; then
+        cmd="$cmd -a android.intent.action.VIEW -d \"$PRIVATE_SERVER\""
+    fi
     
-    # COMMAND SAKTI (Gabungan -n dan -d)
-    # -n : Memaksa buka package spesifik (Bypass 'Open With')
-    # -d : Data link private server
-    # -a : Action View
-    
-    su -c "am start -n $PACKAGE_NAME/$ACTIVITY_NAME -a android.intent.action.VIEW -d '$PRIVATE_SERVER'" > /dev/null 2>&1
+    # Execute
+    su -c "$cmd" > /dev/null 2>&1
     
     if [ $? -eq 0 ]; then
-        echo "[SUCCESS] Roblox diluncurkan ke Private Server!"
+        print_ok "Game launched successfully!"
     else
-        echo "[ERROR] Gagal launch. Cek Package Name: $PACKAGE_NAME"
+        print_error "Failed to launch. Check Package Name in config."
     fi
 }
 
-# --- MAIN LOOP ---
+# --- 6. Main Loop ---
+countdown() {
+    local seconds=$1
+    while [ $seconds -gt 0 ]; do
+        echo -ne "${YELLOW}\r[*] Rejoining in $seconds seconds... ${NC}"
+        sleep 1
+        : $((seconds--))
+    done
+    echo -e "\n"
+}
+
 main() {
-    # Setup awal sekali jalan
-    check_and_create_swap
+    # Initial Setup
+    setup_swap
     
     while true; do
-        clear
-        echo "=============================="
-        echo "   AUTO FARM OPTIMIZER v2.0   "
-        echo "=============================="
-        echo "Waktu: $(date +%H:%M:%S)"
+        echo -e "${BLUE}========================================${NC}"
+        echo -e "      ${GREEN}DIVINETOOLS AUTO-FARM${NC}            "
+        echo -e "${BLUE}========================================${NC}"
+        echo "Time: $(date +%H:%M:%S)"
         
-        # 1. Jalankan Optimasi
-        boost_device
-        
-        # 2. Luncurkan Game
+        optimize_device
         launch_roblox
         
-        # 3. Monitoring Loop
-        echo ""
-        echo "Game berjalan. Script akan refresh dalam 30 menit."
-        echo "Tekan CTRL+C untuk stop."
-        
-        # Di sini kita sleep lama (misal 30 menit) karena auto-farm biasanya lama.
-        # Kalau logic Abang mau rejoin tiap error, logicnya beda lagi.
-        # Untuk sekarang saya set rejoin tiap 1800 detik (30 menit) preventif crash.
-        sleep 1800 
+        print_info "Session started. Waiting for next cycle..."
+        countdown $REJOIN_DELAY
     done
 }
 
-# Eksekusi
+# Start
 main
