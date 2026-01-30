@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 7.4 (Anti-Freeze Input)
+# Version 7.5 (Manual Menu Fix)
 
 # Colors
 C='\033[1;36m' # Cyan
@@ -38,7 +38,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v7.4 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v7.5 ===${N}"
     echo ""
 }
 
@@ -139,20 +139,45 @@ configure_links() {
             USER_MAP["$pkg"]=$(get_username "$pkg")
         done
 
-        for ((i=0; i<${#PACKAGES[@]}; i++)); do
-            local pkg="${PACKAGES[$i]}"
-            local user="${USER_MAP[$pkg]}"
-            local display="$pkg"
-            [ -n "$user" ] && display="$pkg ($user)"
+        while true; do
+            header
+            echo -e "${W}>>> PRIVATE SERVER LINKS${N}"
+            echo -e "${C}------------------------------${N}"
             
-            echo -e "${W}Link for $display:${N}"
+            for ((i=0; i<${#PACKAGES[@]}; i++)); do
+                local pkg="${PACKAGES[$i]}"
+                local user="${USER_MAP[$pkg]}"
+                local display="$pkg"
+                [ -n "$user" ] && display="$pkg ($user)"
+                
+                local current_link=$(jq -r --arg pkg "$pkg" '.private_servers.urls[$pkg] // empty' "$CONFIG_FILE")
+                local status="${R}[Empty]${N}"
+                if [ -n "$current_link" ]; then status="${G}[Set]${N}"; fi
+                
+                echo -e " [${W}$((i+1))${N}] $display $status"
+            done
+            
+            echo -e "${C}------------------------------${N}"
+            echo -e "${W}Type number to edit, or 'd' when done.${N}"
             echo -ne "${Y}> ${N}" 
-            read -r LINK < /dev/tty
+            read -r SEL < /dev/tty
             
-            # Append link immediately to JSON
-            TMP=$(mktemp)
-            jq --arg pkg "$pkg" --arg link "$LINK" '.private_servers.urls[$pkg] = $link' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
-            rm -f "$TMP"
+            if [[ "$SEL" == "d" || "$SEL" == "D" ]]; then break; fi
+            
+            if [[ "$SEL" =~ ^[0-9]+$ ]] && [ "$SEL" -ge 1 ] && [ "$SEL" -le ${#PACKAGES[@]} ]; then
+                local idx=$((SEL-1))
+                local pkg="${PACKAGES[$idx]}"
+                
+                echo -e "${W}Enter URL for $pkg:${N}"
+                echo -ne "${Y}> ${N}" 
+                read -r LINK < /dev/tty
+                
+                if [ -n "$LINK" ]; then
+                    TMP=$(mktemp)
+                    jq --arg pkg "$pkg" --arg link "$LINK" '.private_servers.urls[$pkg] = $link' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+                    rm -f "$TMP"
+                fi
+            fi
         done
     fi
 }
