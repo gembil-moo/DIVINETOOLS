@@ -1,9 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 7.3 (Robust Loop Fix)
-
-# Redirect stdin to FD 3 to prevent read skipping in loops
-exec 3<&0
+# Version 7.4 (Anti-Freeze Input)
 
 # Colors
 C='\033[1;36m' # Cyan
@@ -41,7 +38,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v7.3 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v7.4 ===${N}"
     echo ""
 }
 
@@ -68,14 +65,14 @@ configure_packages() {
     # 1. Package Detection
     echo -e "${W}Auto Detect [a] or Manual [m]?${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e PKG_OPT
+    read -r PKG_OPT < /dev/tty
     PKG_OPT=${PKG_OPT:-a}
 
     PACKAGES=()
     if [[ "$PKG_OPT" =~ ^[Mm]$ ]]; then
         echo -e "${W}Enter package names (space separated):${N}"
         echo -ne "${Y}> ${N}"
-        read -u 3 -e MANUAL_PKGS
+        read -r MANUAL_PKGS < /dev/tty
         IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
     else
         msg "Scanning..."
@@ -87,7 +84,7 @@ configure_packages() {
             error "No packages found!"
             echo -e "${W}Enter manually:${N}"
             echo -ne "${Y}> ${N}"
-            read -u 3 -e MANUAL_PKGS
+            read -r MANUAL_PKGS < /dev/tty
             IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
         else
             success "Found ${#PACKAGES[@]} packages."
@@ -119,12 +116,12 @@ configure_links() {
     
     echo -e "${W}Use 1 Private Link for ALL accounts? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e ONE_LINK
+    read -r ONE_LINK < /dev/tty
 
     if [[ "$ONE_LINK" =~ ^[Yy]$ ]]; then
         echo -e "${W}Enter VIP Link:${N}"
         echo -ne "${Y}> ${N}" 
-        read -u 3 -e PS_URL
+        read -r PS_URL < /dev/tty
         
         TMP=$(mktemp)
         jq --arg url "$PS_URL" '.private_servers.mode = "same" | .private_servers.url = $url' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
@@ -135,15 +132,22 @@ configure_links() {
         jq '.private_servers.mode = "per_package"' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
         rm -f "$TMP"
 
+        # Pre-fetch usernames to prevent su calls inside the input loop (Redfinger fix)
+        msg "Loading account info..."
+        declare -A USER_MAP
+        for pkg in "${PACKAGES[@]}"; do
+            USER_MAP["$pkg"]=$(get_username "$pkg")
+        done
+
         for ((i=0; i<${#PACKAGES[@]}; i++)); do
             local pkg="${PACKAGES[$i]}"
-            local user=$(get_username "$pkg")
+            local user="${USER_MAP[$pkg]}"
             local display="$pkg"
             [ -n "$user" ] && display="$pkg ($user)"
             
             echo -e "${W}Link for $display:${N}"
             echo -ne "${Y}> ${N}" 
-            read -u 3 -e LINK
+            read -r LINK < /dev/tty
             
             # Append link immediately to JSON
             TMP=$(mktemp)
@@ -158,7 +162,7 @@ configure_settings() {
     msg "Dashboard Settings"
     echo -e "${W}Mask Usernames in Dashboard? (e.g. DIxxxNE) [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e MASK_OPT
+    read -r MASK_OPT < /dev/tty
     MASKING=false
     [[ "$MASK_OPT" =~ ^[Yy]$ ]] && MASKING=true
     
@@ -170,13 +174,13 @@ configure_settings() {
     msg "Timing Settings"
     echo -e "${W}Launch Delay (seconds)? (Default 30)${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e LAUNCH_DELAY
+    read -r LAUNCH_DELAY < /dev/tty
     LAUNCH_DELAY=${LAUNCH_DELAY:-30}
     if [ "$LAUNCH_DELAY" -lt 30 ]; then LAUNCH_DELAY=30; fi
 
     echo -e "${W}Reset Interval (minutes)? (0=Off)${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e RESET_INT
+    read -r RESET_INT < /dev/tty
     RESET_INT=${RESET_INT:-0}
     
     TMP=$(mktemp)
@@ -189,7 +193,7 @@ configure_webhook() {
     msg "Webhook Settings"
     echo -e "${W}Enable Webhook? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e WH_OPT
+    read -r WH_OPT < /dev/tty
     
     WH_ENABLED=false
     WH_URL=""
@@ -200,17 +204,17 @@ configure_webhook() {
         WH_ENABLED=true
         echo -e "${W}Webhook URL:${N}"
         echo -ne "${Y}> ${N}" 
-        read -u 3 -e WH_URL
+        read -r WH_URL < /dev/tty
         
         echo -e "${W}Mode (1. Send New, 2. Edit):${N}"
         echo -ne "${Y}> ${N}" 
-        read -u 3 -e WH_MODE_OPT
+        read -r WH_MODE_OPT < /dev/tty
         [[ "$WH_MODE_OPT" == "2" ]] && WH_MODE="edit"
 
         while true; do
             echo -e "${W}Interval (min 5 mins):${N}"
             echo -ne "${Y}> ${N}" 
-            read -u 3 -e WH_INTERVAL
+            read -r WH_INTERVAL < /dev/tty
             if [[ "$WH_INTERVAL" =~ ^[0-9]+$ ]] && [ "$WH_INTERVAL" -ge 5 ]; then
                 break
             else
@@ -230,14 +234,14 @@ configure_autoexec() {
     msg "Auto-Execute Script"
     echo -e "${W}Configure Auto-Execute Script? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -u 3 -e AUTO_EXEC_OPT
+    read -r AUTO_EXEC_OPT < /dev/tty
 
     if [[ "$AUTO_EXEC_OPT" =~ ^[Yy]$ ]]; then
         echo -e "${W}Select Executor:${N}"
         echo -e "1. Delta"
         echo -e "2. Fluxus"
         echo -ne "${Y}> ${N}" 
-        read -u 3 -e EXEC_SEL
+        read -r EXEC_SEL < /dev/tty
         
         TARGET_DIR=""
         if [ "$EXEC_SEL" == "1" ]; then
@@ -256,7 +260,7 @@ configure_autoexec() {
             while true; do
                 echo -e "${W}Paste content for script_${COUNT}.txt (Type 'END' on new line to finish):${N}"
                 SCRIPT_CONTENT=""
-                while IFS= read -u 3 -e line; do
+                while IFS= read -r line < /dev/tty; do
                     [ "$line" == "END" ] && break
                     SCRIPT_CONTENT+="$line"$'\n'
                 done
@@ -275,7 +279,7 @@ configure_autoexec() {
 
                 echo -e "${W}Add another script? [y/n]${N}"
                 echo -ne "${Y}> ${N}" 
-                read -u 3 -e AGAIN
+                read -r AGAIN < /dev/tty
                 if [[ "$AGAIN" != "y" ]]; then break; fi
                 ((COUNT++))
             done
@@ -297,7 +301,7 @@ setup_wizard() {
     
     success "Configuration Saved!"
     echo -e "${W}Press Enter to return...${N}" 
-    read -u 3 -e dummy
+    read -r dummy < /dev/tty
 }
 
 # Edit Configuration Sub-Menu
@@ -332,7 +336,7 @@ edit_config_menu() {
         echo -e "${C}7.${W} Back to Main Menu"
         echo -e "${C}------------------------------${N}"
         echo -ne "${Y}Select [1-7]: ${N}" 
-        read -u 3 -e SUB_OPT
+        read -r SUB_OPT < /dev/tty
 
         case $SUB_OPT in
             1) # Edit Packages
@@ -353,13 +357,13 @@ edit_config_menu() {
             6) # View Full Config
                 msg "Full Configuration"
                 jq '.' "$CONFIG_FILE"
-                read -u 3 -e dummy
+                read -r dummy < /dev/tty
                 ;;
             7) return ;;
             *) error "Invalid Option" ;;
         esac
         echo -e "${W}Press Enter to continue...${N}" 
-        read -u 3 -e dummy
+        read -r dummy < /dev/tty
     done
 }
 
@@ -373,7 +377,7 @@ while true; do
     echo -e "${C}5.${W} Exit"
     echo -e "${C}------------------------------${N}"
     echo -ne "${Y}Select [1-5]: ${N}" 
-    read -u 3 -e OPT
+    read -r OPT < /dev/tty
 
     case $OPT in
         1) setup_wizard ;;
@@ -383,7 +387,7 @@ while true; do
             else
                 error "Config not found! Run Setup first."
                 echo -e "${W}Press Enter...${N}" 
-                read -u 3 -e dummy
+                read -r dummy < /dev/tty
             fi
             ;;
         3) 
@@ -392,7 +396,7 @@ while true; do
             else
                 error "run.sh not found!"
                 echo -e "${W}Press Enter...${N}" 
-                read -u 3 -e dummy
+                read -r dummy < /dev/tty
             fi
             ;;
         4)
