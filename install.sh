@@ -2,35 +2,38 @@
 
 # DIVINETOOLS Installer
 
-# --- UI Colors ---
+# Colors
+C='\033[1;36m' # Cyan
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-echo ""
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}      DIVINETOOLS INSTALLER             ${NC}"
-echo -e "${GREEN}========================================${NC}"
+# Header
+header() {
+    clear
+    echo -e "${C}"
+    echo "   ___  _____    _(_)___  ___"
+    echo "  / _ \/  _/ |  / / / _ \/ _ \\"
+    echo " / // // / | | / / / // /  __/"
+    echo "/____/___/ |___/_/_/_//_/\\___/"
+    echo -e "${NC}"
+    echo -e "${C}=== DIVINE TOOLS INSTALLER ===${NC}"
+    echo ""
+}
 
-# 1. Root Check
-echo -e "${GREEN}[*] Checking Root Access...${NC}"
-if ! command -v su >/dev/null 2>&1 || ! su -c "id" >/dev/null 2>&1; then
-    echo -e "${GREEN}[!] WARNING: Root access not found!${NC}"
-    echo -e "${GREEN}[!] Device optimization features will not work.${NC}"
-else
-    echo -e "${GREEN}[OK] Root access detected.${NC}"
-fi
+header
 
-# 2. Dependencies
-echo -e "${GREEN}[*] Installing dependencies...${NC}"
+# 1. Update & Install Dependencies
+echo -e "${C}[*] Updating and installing dependencies...${NC}"
 pkg update -y >/dev/null 2>&1
-pkg install -y jq tsu ncurses-utils git >/dev/null 2>&1
-echo -e "${GREEN}[OK] Dependencies installed.${NC}"
+pkg install -y git jq tsu ncurses-utils >/dev/null 2>&1
 
-# 3. Setup Directories
-echo -e "${GREEN}[*] Setting up directories...${NC}"
+# 2. Create Directory Structure
+echo -e "${C}[*] Creating directory structure...${NC}"
 mkdir -p config logs workspace
+
+# 3. Set Permissions
+echo -e "${C}[*] Setting permissions...${NC}"
 chmod +x *.sh 2>/dev/null
-echo -e "${GREEN}[OK] Directories created: config, logs, workspace${NC}"
 
 # 4. Finish
 echo ""
