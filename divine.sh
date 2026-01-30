@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 5.3
+# Version 5.4
 
 # Colors
 C='\033[1;36m' # Cyan
@@ -16,12 +16,12 @@ mkdir -p config
 header() {
     clear
     echo -e "${C}"
-    echo "   ___  _____    _(_)___  ___"
+    echo "   ___  _____    _(_)___  ___ "
     echo "  / _ \/  _/ |  / / / _ \/ _ \\"
     echo " / // // / | | / / / // /  __/"
-    echo "/____/___/ |___/_/_/_//_/\\___/"
+    echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v5.3 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v5.4 ===${N}"
     echo ""
 }
 
@@ -57,9 +57,10 @@ setup_wizard() {
         IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
     else
         msg "Scanning..."
-        while IFS= read -r line; do
-            [ -n "$line" ] && PACKAGES+=("$line")
-        done < <(pm list packages | grep roblox | cut -d: -f2)
+        # Fix: Use command substitution to avoid pipe subshell issues with read later
+        DETECTED_PKGS=$(pm list packages | grep roblox | cut -d: -f2)
+        # Convert newline separated string to array
+        mapfile -t PACKAGES <<< "$DETECTED_PKGS"
         
         if [ ${#PACKAGES[@]} -eq 0 ]; then
             error "No packages found!"
@@ -86,13 +87,16 @@ setup_wizard() {
         echo -e "${W}Enter VIP Link:${N}"
         read -r -p "> " PS_URL
     else
+        # Fix: Use for loop instead of while read to ensure user input works
         for pkg in "${PACKAGES[@]}"; do
-            local user=$(get_username "$pkg")
-            local display="$pkg"
-            [ -n "$user" ] && display="$pkg ($user)"
-            echo -e "${W}Link for $display:${N}"
-            read -r -p "> " LINK
-            PS_URLS["$pkg"]="$LINK"
+            if [ -n "$pkg" ]; then
+                local user=$(get_username "$pkg")
+                local display="$pkg"
+                [ -n "$user" ] && display="$pkg ($user)"
+                echo -e "${W}Link for $display:${N}"
+                read -r -p "> " LINK
+                PS_URLS["$pkg"]="$LINK"
+            fi
         done
     fi
 
