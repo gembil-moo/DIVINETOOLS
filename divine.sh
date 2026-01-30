@@ -99,7 +99,10 @@ configure_links() {
     msg "Private Servers"
     
     # Load packages from config to ensure we have the latest list
-    mapfile -t PACKAGES < <(jq -r '.packages[]' "$CONFIG_FILE")
+    PACKAGES=()
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && PACKAGES+=("$line")
+    done < <(jq -r '.packages[] // empty' "$CONFIG_FILE")
     
     echo -e "${W}Use 1 Private Link for ALL accounts? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
@@ -118,6 +121,11 @@ configure_links() {
         TMP=$(mktemp)
         jq '.private_servers.mode = "per_package"' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
         rm -f "$TMP"
+
+        if [ ${#PACKAGES[@]} -eq 0 ]; then
+            error "No packages found to configure! Please add packages first."
+            return
+        fi
 
         for pkg in "${PACKAGES[@]}"; do
             local user=$(get_username "$pkg")
