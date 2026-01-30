@@ -113,7 +113,7 @@ launch_accounts() {
 draw_dashboard() {
     while true; do
         clear
-        # HEADER
+        # HEADER (Kaeru Style)
         echo -e "${C}"
         echo "  ██████╗ ██╗██╗   ██╗██╗███╗   ██╗███████╗"
         echo "  ██╔══██╗██║██║   ██║██║████╗  ██║██╔════╝"
@@ -121,46 +121,41 @@ draw_dashboard() {
         echo "  ██║  ██║██║╚██╗ ██╔╝██║██║╚██╗██║██╔══╝  "
         echo "  ██████╔╝██║ ╚████╔╝ ██║██║ ╚████║███████╗"
         echo "  ╚═════╝ ╚═╝  ╚═══╝  ╚═╝╚═╝  ╚═══╝╚══════╝"
-        echo -e "         ${W}ENGINE & DASHBOARD${N}"
+        echo -e "       ${W}ENGINE & DASHBOARD${N}"
         echo ""
 
         # SYSTEM STATS
-        # Get Free RAM in MB (Column 4 of Mem row)
         FREE_RAM=$(free -m | awk '/Mem:/ {print $4}')
-        TIME_NOW=$(date +"%H:%M:%S")
-        
-        echo -e "${C}╔═══════════════════════════╦═══════════════════╗${N}"
-        echo -e "${C}║ TIME: ${W}$TIME_NOW${C}           ║ FREE RAM: ${W}${FREE_RAM}MB${C}    ║${N}"
-        echo -e "${C}╚═══════════════════════════╩═══════════════════╝${N}"
+        echo -e "${W}System Memory: ${G}${FREE_RAM} MB Free${N}"
         echo ""
 
         # TABLE
-        echo -e "${C}┌────┬─────────────────────────────┬──────────────┬──────────┐${N}"
-        echo -e "${C}│ NO │ PACKAGE NAME                │ CLONE NAME   │ STATUS   │${N}"
-        echo -e "${C}├────┼─────────────────────────────┼──────────────┼──────────┤${N}"
+        echo -e "${C}+----+----------------------+--------+${N}"
+        echo -e "${C}| NO | PACKAGE/CLONE        | STATUS |${N}"
+        echo -e "${C}+----+----------------------+--------+${N}"
 
         local i=1
         for pkg in "${PACKAGES[@]}"; do
-            # Clone Name logic: extract last part of package or just use pkg
-            # e.g. com.roblox.client -> client
+            # Clone Name (Last part)
             local clone_name="${pkg##*.}"
+            # Truncate to 20 chars
+            if [ ${#clone_name} -gt 20 ]; then clone_name="${clone_name:0:17}..."; fi
             
             # Check Status
-            local status_text="${R}OFFLINE${N}"
-            # pgrep -f matches full command line. 
+            local status_text="[OFF]"
+            local status_color="${R}"
             if pgrep -f "$pkg" >/dev/null; then
-                status_text="${G}ONLINE ${N}"
+                status_text="[ON]"
+                status_color="${G}"
             fi
             
-            # Format Output
-            # %-27s for package (truncate if needed)
-            # %-12s for clone
-            printf "${C}│${N} %-2d ${C}│${N} %-27.27s ${C}│${N} %-12.12s ${C}│${N} %b    ${C}│${N}\n" "$i" "$pkg" "$clone_name" "$status_text"
+            # Format: | NO | CLONE | STATUS |
+            printf "${C}|${N} %-2d ${C}|${N} %-20s ${C}|${N} ${status_color}%-6s${N} ${C}|${N}\n" "$i" "$clone_name" "$status_text"
             
             ((i++))
         done
-        echo -e "${C}└────┴─────────────────────────────┴──────────────┴──────────┘${N}"
-        echo -e "\n${Y}[CTRL+C] to Stop${N}"
+        echo -e "${C}+----+----------------------+--------+${N}"
+        echo -e "\n${Y}Refreshing in 5s... (CTRL+C to Stop)${N}"
         
         sleep 5
     done

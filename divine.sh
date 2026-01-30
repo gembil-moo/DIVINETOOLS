@@ -1,20 +1,19 @@
 #!/bin/bash
-# DIVINE TOOLS - PREMIUM UI
-# Version 4.0 (Expert Edition)
+# DIVINE TOOLS - COMPACT MENU
+# Version 3.2
 
 # --- COLORS ---
 C='\033[1;36m' # Cyan
+W='\033[1;37m' # White
 G='\033[1;32m' # Green
 R='\033[1;31m' # Red
-Y='\033[1;33m' # Yellow
-W='\033[1;37m' # White
 N='\033[0m'    # Reset
 
 CONFIG_FILE="config/config.json"
 mkdir -p config
 
 # --- UTILS ---
-show_header() {
+header() {
     clear
     echo -e "${C}"
     echo "  ██████╗ ██╗██╗   ██╗██╗███╗   ██╗███████╗"
@@ -23,228 +22,139 @@ show_header() {
     echo "  ██║  ██║██║╚██╗ ██╔╝██║██║╚██╗██║██╔══╝  "
     echo "  ██████╔╝██║ ╚████╔╝ ██║██║ ╚████║███████╗"
     echo "  ╚═════╝ ╚═╝  ╚═══╝  ╚═╝╚═╝  ╚═══╝╚══════╝"
-    echo -e "         ${W}PREMIUM AUTOMATION TOOL${C}"
-    echo -e "${C}==================================================${N}"
+    echo -e "       ${W}PREMIUM AUTOMATION TOOL${N}"
+    echo -e "${C}=============================================${N}"
 }
 
-print_status() { echo -e "${C}[*] $1${N}"; }
-print_success() { echo -e "${G}[+] $1${N}"; }
-print_error() { echo -e "${R}[!] $1${N}"; }
+msg() { echo -e "${C}[*] ${W}$1${N}"; }
+success() { echo -e "${G}[+] ${W}$1${N}"; }
+error() { echo -e "${R}[!] ${W}$1${N}"; }
 
 # --- SETUP WIZARD ---
-setup_wizard() {
-    show_header
-    echo -e "${Y}>>> CONFIGURATION WIZARD${N}"
-    echo ""
+setup() {
+    header
+    echo -e "${W}>>> SETUP WIZARD${N}"
+    echo -e "${C}---------------------------------------------${N}"
 
-    # 1. Initialize
-    echo "{}" > "$CONFIG_FILE"
-    
-    # 2. Package Detection
+    # 1. Auto-Detect
+    msg "Scanning packages..."
     PACKAGES=()
-    echo -e "${C}[?] Auto Detect Packages? [y/n]${N}"
-    read -p "> " AUTO_DETECT
-    
-    if [[ "$AUTO_DETECT" =~ ^[Yy]$ ]]; then
-        print_status "Scanning for Roblox packages..."
-        # Get list, remove 'package:', filter empty
-        while IFS= read -r line; do
-            if [ -n "$line" ]; then
-                PACKAGES+=("$line")
-            fi
-        done < <(pm list packages | grep roblox | cut -d: -f2)
-        
-        if [ ${#PACKAGES[@]} -eq 0 ]; then
-            print_error "No packages found! Switching to manual mode."
-            AUTO_DETECT="n"
-        else
-            print_success "Found ${#PACKAGES[@]} packages."
-        fi
-    fi
-    
-    if [[ ! "$AUTO_DETECT" =~ ^[Yy]$ ]]; then
-        echo -e "${C}[?] Enter package names separated by space:${N}"
-        read -p "> " MANUAL_PKGS
-        IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
+    while IFS= read -r line; do
+        [ -n "$line" ] && PACKAGES+=("$line")
+    done < <(pm list packages | grep roblox | cut -d: -f2)
+
+    if [ ${#PACKAGES[@]} -eq 0 ]; then
+        error "No Roblox packages found!"
+        echo -e "${W}Enter manually (space sep):${N}"
+        read -p "> " MANUAL
+        IFS=' ' read -r -a PACKAGES <<< "$MANUAL"
+    else
+        success "Found ${#PACKAGES[@]} packages."
     fi
 
-    # Save Packages to JSON
-    jq -n --argjson pkgs "$(printf '%s\n' "${PACKAGES[@]}" | jq -R . | jq -s .)" \
-          '{packages: $pkgs}' > "$CONFIG_FILE"
-
-    # 3. Link Setup
+    # 2. Link Setup
     echo ""
-    echo -e "${C}[?] Use 1 Private Server Link for ALL accounts? [y/n]${N}"
+    msg "Private Server Setup"
+    echo -e "${W}Use 1 VIP Link for ALL accounts? [y/n]${N}"
     read -p "> " ONE_LINK
-    
+
     PS_MODE="per_package"
     PS_URL=""
     declare -A PS_URLS
-    
+
     if [[ "$ONE_LINK" =~ ^[Yy]$ ]]; then
         PS_MODE="same"
-        echo -e "${C}[?] Enter Private Server Link:${N}"
+        echo -e "${W}Enter VIP Link:${N}"
         read -p "> " PS_URL
     else
         for pkg in "${PACKAGES[@]}"; do
-            echo -e "${C}[?] Enter Link for $pkg:${N}"
+            echo -e "${W}Link for $pkg:${N}"
             read -p "> " LINK
             PS_URLS["$pkg"]="$LINK"
         done
     fi
+
+    # 3. Window Mode
+    echo ""
+    msg "Window Settings"
+    echo -e "${W}Enable Freeform/Small Window? [y/n]${N}"
+    read -p "> " WIN_MODE
+    ENABLE_WINDOW=false
+    [[ "$WIN_MODE" =~ ^[Yy]$ ]] && ENABLE_WINDOW=true
+
+    # 4. Auto-Execute
+    echo ""
+    msg "Auto-Execute (Delta)"
+    echo -e "${W}Inject script? [y/n]${N}"
+    read -p "> " INJECT
+
+    if [[ "$INJECT" =~ ^[Yy]$ ]]; then
+        echo -e "${W}Paste script (Type END on new line):${N}"
+        SCRIPT=""
+        while IFS= read -r line; do
+            [ "$line" == "END" ] && break
+            SCRIPT+="$line"$'\n'
+        done
+
+        msg "Injecting..."
+        for pkg in "${PACKAGES[@]}"; do
+            DIR="/sdcard/Android/data/$pkg/files/Delta/Autoexecute"
+            FILE="$DIR/script.txt"
+            
+            su -c "mkdir -p $DIR"
+            TMP=$(mktemp)
+            echo "$SCRIPT" > "$TMP"
+            cat "$TMP" | su -c "cat > $FILE"
+            rm "$TMP"
+            success "Injected to $pkg"
+        done
+    fi
+
+    # 5. Save Config
+    msg "Saving configuration..."
     
-    # Update JSON with Links
-    TMP_JSON=$(mktemp)
+    JSON_PKGS=$(printf '%s\n' "${PACKAGES[@]}" | jq -R . | jq -s .)
+    
     if [ "$PS_MODE" == "same" ]; then
-        jq --arg mode "$PS_MODE" --arg url "$PS_URL" \
-           '.private_servers = {mode: $mode, url: $url}' "$CONFIG_FILE" > "$TMP_JSON"
+        JSON_PS=$(jq -n --arg m "$PS_MODE" --arg u "$PS_URL" '{mode: $m, url: $u, urls: {}}')
     else
-        # Construct JSON object for urls
-        URLS_JSON="{}"
+        JSON_URLS="{}"
         for pkg in "${!PS_URLS[@]}"; do
-            URLS_JSON=$(echo "$URLS_JSON" | jq --arg k "$pkg" --arg v "${PS_URLS[$pkg]}" '.[$k] = $v')
+            JSON_URLS=$(echo "$JSON_URLS" | jq --arg k "$pkg" --arg v "${PS_URLS[$pkg]}" '.[$k] = $v')
         done
-        jq --arg mode "$PS_MODE" --argjson urls "$URLS_JSON" \
-           '.private_servers = {mode: $mode, urls: $urls}' "$CONFIG_FILE" > "$TMP_JSON"
+        JSON_PS=$(jq -n --arg m "$PS_MODE" --argjson u "$JSON_URLS" '{mode: $m, url: "", urls: $u}')
     fi
-    mv "$TMP_JSON" "$CONFIG_FILE"
 
-    # 4. Webhook Setup
-    echo ""
-    echo -e "${C}[?] Enable Webhook? [y/n]${N}"
-    read -p "> " ENABLE_WH
-    
-    WH_ENABLED=false
-    WH_URL=""
-    WH_MODE=1
-    WH_INTERVAL=5
-    
-    if [[ "$ENABLE_WH" =~ ^[Yy]$ ]]; then
-        WH_ENABLED=true
-        echo -e "${C}[?] Webhook URL:${N}"
-        read -p "> " WH_URL
-        echo -e "${C}[?] Mode (1=Send New, 2=Edit):${N}"
-        read -p "> " WH_MODE
-        echo -e "${C}[?] Interval (min 5 mins):${N}"
-        read -p "> " WH_INTERVAL
-        if [ "$WH_INTERVAL" -lt 5 ]; then WH_INTERVAL=5; fi
-    fi
-    
-    # Update JSON Webhook
-    TMP_JSON=$(mktemp)
-    jq --argjson en $WH_ENABLED --arg url "$WH_URL" --argjson mode $WH_MODE --argjson int $WH_INTERVAL \
-       '.webhook = {enabled: $en, url: $url, mode: $mode, interval: $int}' "$CONFIG_FILE" > "$TMP_JSON"
-    mv "$TMP_JSON" "$CONFIG_FILE"
+    JSON_SETTINGS=$(jq -n --argjson wm $ENABLE_WINDOW '{enable_window: $wm, enable_swap: true, swap_size_mb: 2048, enable_cpu_boost: true}')
 
-    # 5. Timing Setup
-    echo ""
-    echo -e "${C}[?] Launch Delay (seconds) [Default: 5]:${N}"
-    read -p "> " LAUNCH_DELAY
-    LAUNCH_DELAY=${LAUNCH_DELAY:-5}
-    
-    echo -e "${C}[?] Reset/Rejoin Interval (minutes) [0=Off]:${N}"
-    read -p "> " RESET_INT
-    RESET_INT=${RESET_INT:-0}
-    
-    # Update JSON Timing
-    TMP_JSON=$(mktemp)
-    jq --argjson ld $LAUNCH_DELAY --argjson ri $RESET_INT \
-       '.timing = {launch_delay: $ld, reset_interval: $ri}' "$CONFIG_FILE" > "$TMP_JSON"
-    mv "$TMP_JSON" "$CONFIG_FILE"
+    jq -n \
+        --argjson pkgs "$JSON_PKGS" \
+        --argjson ps "$JSON_PS" \
+        --argjson set "$JSON_SETTINGS" \
+        '{packages: $pkgs, private_servers: $ps, settings: $set, webhook: {enabled: false}, timing: {launch_delay: 5}}' \
+        > "$CONFIG_FILE"
 
-    # 6. Auto Execute
-    echo ""
-    echo -e "${C}[?] Inject Auto-Execute Script? [y/n]${N}"
-    read -p "> " INJECT_SCRIPT
-    
-    if [[ "$INJECT_SCRIPT" =~ ^[Yy]$ ]]; then
-        echo -e "${C}Select Executor Folder:${N}"
-        echo "1. Delta (autoexec)"
-        echo "2. Fluxus (autoexec)"
-        echo "3. Manual Input"
-        read -p "> " EXEC_OPT
-        
-        EXEC_FOLDER="autoexec"
-        case $EXEC_OPT in
-            1) EXEC_FOLDER="autoexec" ;;
-            2) EXEC_FOLDER="autoexec" ;;
-            3) read -p "Enter folder name: " EXEC_FOLDER ;;
-            *) EXEC_FOLDER="autoexec" ;;
-        esac
-        
-        SCRIPT_COUNT=1
-        while true; do
-            echo ""
-            echo -e "${C}[?] Configure script_${SCRIPT_COUNT}.txt? [y/n]${N}"
-            read -p "> " CONF_SCRIPT
-            if [[ ! "$CONF_SCRIPT" =~ ^[Yy]$ ]]; then break; fi
-            
-            echo -e "${Y}Paste script content below. Type 'END' on a new line to finish:${N}"
-            SCRIPT_CONTENT=""
-            while IFS= read -r line; do
-                if [ "$line" == "END" ]; then break; fi
-                SCRIPT_CONTENT+="$line"$'\n'
-            done
-            
-            print_status "Writing script to packages..."
-            for pkg in "${PACKAGES[@]}"; do
-                # Path: /sdcard/Android/data/[PKG]/files/[FOLDER]/script_X.txt
-                TARGET_DIR="/sdcard/Android/data/$pkg/files/$EXEC_FOLDER"
-                TARGET_FILE="$TARGET_DIR/script_${SCRIPT_COUNT}.txt"
-                
-                # Create Dir
-                su -c "mkdir -p $TARGET_DIR"
-                
-                # Write File (Using pipe to su to avoid permission issues)
-                TMP_SCRIPT=$(mktemp)
-                echo "$SCRIPT_CONTENT" > "$TMP_SCRIPT"
-                cat "$TMP_SCRIPT" | su -c "cat > $TARGET_FILE"
-                rm "$TMP_SCRIPT"
-                
-                print_success "Wrote to $pkg"
-            done
-            ((SCRIPT_COUNT++))
-        done
-    fi
-    
-    print_success "Configuration Complete!"
-    read -p "Press Enter to return..."
+    success "Config Saved!"
+    read -p "Press Enter..."
 }
 
-# --- MAIN LOOP ---
+# --- MAIN MENU ---
 while true; do
-    show_header
-    echo -e "${C}  [1] First Configuration (Setup Wizard)${N}"
-    echo -e "${C}  [2] Run DIVINE (Launch Dashboard)${N}"
-    echo -e "${C}  [3] Edit Configuration (Nano)${N}"
-    echo -e "${C}  [4] Clear Cache${N}"
-    echo -e "${C}  [5] Uninstall${N}"
-    echo -e "${C}  [6] Exit${N}"
-    echo ""
-    echo -e "${C}==================================================${N}"
-    read -p "  Select Option [1-6]: " OPTION
-    
-    case $OPTION in
-        1) setup_wizard ;;
-        2) 
-            if [ -f "run.sh" ]; then bash run.sh; else print_error "run.sh not found!"; sleep 2; fi 
-            ;;
+    header
+    echo -e "${C}1.${W} Setup Wizard"
+    echo -e "${C}2.${W} Start Farming"
+    echo -e "${C}3.${W} Edit Config"
+    echo -e "${C}4.${W} Clear Cache"
+    echo -e "${C}5.${W} Exit"
+    echo -e "${C}---------------------------------------------${N}"
+    read -p "Select [1-5]: " OPT
+
+    case $OPT in
+        1) setup ;;
+        2) [ -f run.sh ] && bash run.sh || error "run.sh missing" ;;
         3) nano "$CONFIG_FILE" ;;
-        4) 
-            rm -rf logs/* 2>/dev/null
-            print_success "Cache cleared."
-            sleep 1
-            ;;
-        5)
-            echo -e "${R}Are you sure you want to uninstall? [y/n]${N}"
-            read -p "> " CONFIRM
-            if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
-                rm -rf config logs src *.sh *.json
-                echo "Uninstalled."
-                exit 0
-            fi
-            ;;
-        6) exit 0 ;;
+        4) rm -rf logs/* 2>/dev/null; success "Cache Cleared"; sleep 1 ;;
+        5) exit 0 ;;
         *) print_error "Invalid Option"; sleep 1 ;;
     esac
 done
