@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - ENGINE & DASHBOARD
-# Version 5.4 (Kaeru Replica)
+# Version 6.0 (Ultimate Optimization)
 
 # --- COLORS ---
 C='\033[1;36m' # Cyan
@@ -69,17 +69,26 @@ mask_string() {
 
 # --- SYSTEM OPTIMIZATION ---
 optimize_system() {
-    echo -e "${C}[*] Optimizing System...${N}"
+    echo -e "${C}[*] Applying Ultimate 5-Step Optimization...${N}"
     
-    # 1. RAM Cleaner
+    # 1. CPU Governor (Performance)
+    echo -e "${Y}    [1/5] CPU Governor -> Performance${N}"
+    if [ "$ENABLE_BOOST" == "true" ]; then
+        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+            su -c "echo performance > $cpu" >/dev/null 2>&1
+        done
+    fi
+
+    # 2. RAM Cleaning (Kill & Flush & Swap)
+    echo -e "${Y}    [2/5] RAM Cleaning & Swap${N}"
     if command -v su >/dev/null; then
+        su -c "am kill-all" >/dev/null 2>&1
         su -c "sync; echo 3 > /proc/sys/vm/drop_caches" >/dev/null 2>&1
     fi
 
-    # 2. Swap Manager
     if [ "$SWAP" == "true" ]; then
         if ! su -c "[ -f /data/swapfile ]"; then
-            echo -e "${Y}    -> Creating 2GB Swap...${N}"
+            echo -e "${W}          Creating 2GB Swap...${N}"
             su -c "dd if=/dev/zero of=/data/swapfile bs=1M count=2048" >/dev/null 2>&1
             su -c "mkswap /data/swapfile" >/dev/null 2>&1
             su -c "chmod 600 /data/swapfile" >/dev/null 2>&1
@@ -87,12 +96,27 @@ optimize_system() {
         su -c "swapon /data/swapfile" >/dev/null 2>&1
     fi
 
-    # 3. CPU Boost
-    if [ "$ENABLE_BOOST" == "true" ]; then
-        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-            su -c "echo performance > $cpu" >/dev/null 2>&1
-        done
-    fi
+    # 3. Android Settings (Animation & Touch)
+    echo -e "${Y}    [3/5] Disabling Animations & Tuning Touch${N}"
+    su -c "settings put global window_animation_scale 0" >/dev/null 2>&1
+    su -c "settings put global transition_animation_scale 0" >/dev/null 2>&1
+    su -c "settings put global animator_duration_scale 0" >/dev/null 2>&1
+    su -c "settings put secure long_press_timeout 250" >/dev/null 2>&1
+    su -c "settings put system pointer_speed 7" >/dev/null 2>&1
+
+    # 4. Thermal Throttling Disable
+    echo -e "${Y}    [4/5] Stopping Thermal Services${N}"
+    su -c "stop thermald" >/dev/null 2>&1
+    su -c "stop thermal-engine" >/dev/null 2>&1
+
+    # 5. Build.prop / GPU Tweaks (Runtime)
+    echo -e "${Y}    [5/5] Forcing GPU Rendering & Low RAM Mode${N}"
+    su -c "setprop debug.sf.hw 1" >/dev/null 2>&1
+    su -c "setprop video.accelerate.hw 1" >/dev/null 2>&1
+    su -c "setprop debug.egl.hw 1" >/dev/null 2>&1
+    su -c "setprop ro.config.low_ram true" >/dev/null 2>&1
+
+    echo -e "${G}[OK] System Optimized.${N}"
     sleep 1
 }
 

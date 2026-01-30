@@ -1,6 +1,9 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 6.3 (Manual Menu Fix)
+# Version 7.1 (Auto-Exec Loop Fix)
+
+# Redirect stdin to FD 3 to prevent read skipping in loops
+exec 3<&0
 
 # Colors
 C='\033[1;36m' # Cyan
@@ -12,6 +15,17 @@ N='\033[0m'    # Reset
 CONFIG_FILE="config/config.json"
 mkdir -p config
 
+# Initialize Config if missing
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo '{
+        "packages": [],
+        "private_servers": {"mode": "same", "url": "", "urls": {}},
+        "webhook": {"enabled": false},
+        "timing": {"launch_delay": 30, "reset_interval": 0},
+        "settings": {"masking": false, "enable_swap": true, "enable_cpu_boost": true}
+    }' > "$CONFIG_FILE"
+fi
+
 # Header
 header() {
     clear
@@ -21,7 +35,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v6.3 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v7.1 ===${N}"
     echo ""
 }
 
@@ -38,24 +52,24 @@ get_username() {
     fi
 }
 
-# Setup Wizard
-setup_wizard() {
-    header
-    echo -e "${W}>>> CONFIGURATION WIZARD${N}"
-    echo -e "${C}------------------------------${N}"
+# --- CONFIGURATION FUNCTIONS ---
+
+configure_packages() {
+    msg "Package Configuration"
+    echo -e "${W}Current Packages:${N}"
+    jq -r '.packages[]' "$CONFIG_FILE" | nl
 
     # 1. Package Detection
-    msg "Package Detection"
     echo -e "${W}Auto Detect [a] or Manual [m]?${N}"
     echo -ne "${Y}> ${N}" 
-    read -r PKG_OPT
+    read -u 3 -e PKG_OPT
     PKG_OPT=${PKG_OPT:-a}
 
     PACKAGES=()
     if [[ "$PKG_OPT" =~ ^[Mm]$ ]]; then
         echo -e "${W}Enter package names (space separated):${N}"
         echo -ne "${Y}> ${N}"
-        read -r MANUAL_PKGS
+        read -u 3 -e MANUAL_PKGS
         IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
     else
         msg "Scanning..."
@@ -67,78 +81,98 @@ setup_wizard() {
             error "No packages found!"
             echo -e "${W}Enter manually:${N}"
             echo -ne "${Y}> ${N}"
-            read -r MANUAL_PKGS
+            read -u 3 -e MANUAL_PKGS
             IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
         else
             success "Found ${#PACKAGES[@]} packages."
         fi
     fi
 
+    # Save Packages immediately
+    TMP=$(mktemp)
+    jq --argjson pkgs "$(printf '%s\n' "${PACKAGES[@]}" | jq -R . | jq -s .)" '.packages = $pkgs' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+    rm -f "$TMP"
+}
+
+configure_links() {
     # 2. Private Server Links
-    echo ""
     msg "Private Servers"
+    
+    # Load packages from config to ensure we have the latest list
+    mapfile -t PACKAGES < <(jq -r '.packages[]' "$CONFIG_FILE")
+    
     echo -e "${W}Use 1 Private Link for ALL accounts? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -r ONE_LINK
-
-    PS_MODE="per_package"
-    PS_URL=""
-    declare -A PS_URLS
+    read -u 3 -e ONE_LINK
 
     if [[ "$ONE_LINK" =~ ^[Yy]$ ]]; then
-        PS_MODE="same"
         echo -e "${W}Enter VIP Link:${N}"
         echo -ne "${Y}> ${N}" 
-        read -r PS_URL
+        read -u 3 -e PS_URL
+        
+        TMP=$(mktemp)
+        jq --arg url "$PS_URL" '.private_servers.mode = "same" | .private_servers.url = $url' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+        rm -f "$TMP"
     else
-        # MANUAL MENU MODE (Anti-Freeze & User Friendly)
-        while true; do
-            header
-            echo -e "${W}>>> PRIVATE SERVER LINKS${N}"
-            echo -e "${C}------------------------------${N}"
+        # Set mode to per_package first
+        TMP=$(mktemp)
+        jq '.private_servers.mode = "per_package"' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+        rm -f "$TMP"
+
+        for pkg in "${PACKAGES[@]}"; do
+            local user=$(get_username "$pkg")
+            local display="$pkg"
+            [ -n "$user" ] && display="$pkg ($user)"
             
-            for ((i=0; i<${#PACKAGES[@]}; i++)); do
-                PKG="${PACKAGES[$i]}"
-                CURRENT="${PS_URLS[$PKG]}"
-                STATUS="${R}Empty${N}"
-                if [ -n "$CURRENT" ]; then STATUS="${G}Set${N}"; fi
-                echo -e " [${W}$((i+1))${N}] $PKG : $STATUS"
-            done
+            echo -e "${W}Link for $display:${N}"
+            echo -ne "${Y}> ${N}" 
+            read -u 3 -e LINK
             
-            echo -e "${C}------------------------------${N}"
-            echo -e "${W}Type number to edit link, or 'd' when done.${N}"
-            echo -ne "${Y}> ${N}"
-            read -r SEL
-            
-            if [[ "$SEL" == "d" || "$SEL" == "D" ]]; then break; fi
-            
-            if [[ "$SEL" =~ ^[0-9]+$ ]] && [ "$SEL" -ge 1 ] && [ "$SEL" -le ${#PACKAGES[@]} ]; then
-                IDX=$((SEL-1))
-                SELECTED_PKG="${PACKAGES[$IDX]}"
-                
-                echo -e "${W}Enter URL for $SELECTED_PKG:${N}"
-                echo -ne "${Y}> ${N}"
-                read -r INPUT_URL
-                if [ -n "$INPUT_URL" ]; then PS_URLS["$SELECTED_PKG"]="$INPUT_URL"; fi
-            fi
+            # Append link immediately to JSON
+            TMP=$(mktemp)
+            jq --arg pkg "$pkg" --arg link "$LINK" '.private_servers.urls[$pkg] = $link' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+            rm -f "$TMP"
         done
     fi
+}
 
+configure_settings() {
     # 3. Username Masking
-    echo ""
     msg "Dashboard Settings"
     echo -e "${W}Mask Usernames in Dashboard? (e.g. DIxxxNE) [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -r MASK_OPT
+    read -u 3 -e MASK_OPT
     MASKING=false
     [[ "$MASK_OPT" =~ ^[Yy]$ ]] && MASKING=true
+    
+    TMP=$(mktemp)
+    jq --argjson mask $MASKING '.settings.masking = $mask' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+    rm -f "$TMP"
 
+    # 5. Timing Setup
+    msg "Timing Settings"
+    echo -e "${W}Launch Delay (seconds)? (Default 30)${N}"
+    echo -ne "${Y}> ${N}" 
+    read -u 3 -e LAUNCH_DELAY
+    LAUNCH_DELAY=${LAUNCH_DELAY:-30}
+    if [ "$LAUNCH_DELAY" -lt 30 ]; then LAUNCH_DELAY=30; fi
+
+    echo -e "${W}Reset Interval (minutes)? (0=Off)${N}"
+    echo -ne "${Y}> ${N}" 
+    read -u 3 -e RESET_INT
+    RESET_INT=${RESET_INT:-0}
+    
+    TMP=$(mktemp)
+    jq --argjson ld $LAUNCH_DELAY --argjson ri $RESET_INT '.timing = {launch_delay: $ld, reset_interval: $ri}' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+    rm -f "$TMP"
+}
+
+configure_webhook() {
     # 4. Webhook Setup
-    echo ""
     msg "Webhook Settings"
     echo -e "${W}Enable Webhook? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -r WH_OPT
+    read -u 3 -e WH_OPT
     
     WH_ENABLED=false
     WH_URL=""
@@ -149,17 +183,17 @@ setup_wizard() {
         WH_ENABLED=true
         echo -e "${W}Webhook URL:${N}"
         echo -ne "${Y}> ${N}" 
-        read -r WH_URL
+        read -u 3 -e WH_URL
         
         echo -e "${W}Mode (1. Send New, 2. Edit):${N}"
         echo -ne "${Y}> ${N}" 
-        read -r WH_MODE_OPT
+        read -u 3 -e WH_MODE_OPT
         [[ "$WH_MODE_OPT" == "2" ]] && WH_MODE="edit"
 
         while true; do
             echo -e "${W}Interval (min 5 mins):${N}"
             echo -ne "${Y}> ${N}" 
-            read -r WH_INTERVAL
+            read -u 3 -e WH_INTERVAL
             if [[ "$WH_INTERVAL" =~ ^[0-9]+$ ]] && [ "$WH_INTERVAL" -ge 5 ]; then
                 break
             else
@@ -167,34 +201,26 @@ setup_wizard() {
             fi
         done
     fi
+    
+    TMP=$(mktemp)
+    jq --argjson en $WH_ENABLED --arg url "$WH_URL" --arg mode "$WH_MODE" --argjson int "$WH_INTERVAL" \
+       '.webhook = {enabled: $en, url: $url, mode: $mode, interval: $int}' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+    rm -f "$TMP"
+}
 
-    # 5. Timing Setup
-    echo ""
-    msg "Timing Settings"
-    echo -e "${W}Launch Delay (seconds)? (Default 30)${N}"
-    echo -ne "${Y}> ${N}" 
-    read -r LAUNCH_DELAY
-    LAUNCH_DELAY=${LAUNCH_DELAY:-30}
-    if [ "$LAUNCH_DELAY" -lt 30 ]; then LAUNCH_DELAY=30; fi
-
-    echo -e "${W}Reset Interval (minutes)? (0=Off)${N}"
-    echo -ne "${Y}> ${N}" 
-    read -r RESET_INT
-    RESET_INT=${RESET_INT:-0}
-
+configure_autoexec() {
     # 6. Auto Execute Script
-    echo ""
     msg "Auto-Execute Script"
     echo -e "${W}Configure Auto-Execute Script? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
-    read -r AUTO_EXEC_OPT
+    read -u 3 -e AUTO_EXEC_OPT
 
     if [[ "$AUTO_EXEC_OPT" =~ ^[Yy]$ ]]; then
         echo -e "${W}Select Executor:${N}"
         echo -e "1. Delta"
         echo -e "2. Fluxus"
         echo -ne "${Y}> ${N}" 
-        read -r EXEC_SEL
+        read -u 3 -e EXEC_SEL
         
         TARGET_DIR=""
         if [ "$EXEC_SEL" == "1" ]; then
@@ -209,19 +235,16 @@ setup_wizard() {
             msg "Creating directory: $TARGET_DIR"
             mkdir -p "$TARGET_DIR" 2>/dev/null || su -c "mkdir -p $TARGET_DIR"
             
-            echo -e "${W}Create one script for all? [y/n]${N}"
-            echo -ne "${Y}> ${N}" 
-            read -r CREATE_SCRIPT
-            
-            if [[ "$CREATE_SCRIPT" =~ ^[Yy]$ ]]; then
-                echo -e "${W}Paste script content (Type 'END' on new line to finish):${N}"
+            COUNT=1
+            while true; do
+                echo -e "${W}Paste content for script_${COUNT}.txt (Type 'END' on new line to finish):${N}"
                 SCRIPT_CONTENT=""
-                while IFS= read -r line; do
+                while IFS= read -u 3 -e line; do
                     [ "$line" == "END" ] && break
                     SCRIPT_CONTENT+="$line"$'\n'
                 done
 
-                FILE_PATH="$TARGET_DIR/divine_script.lua"
+                FILE_PATH="$TARGET_DIR/script_${COUNT}.txt"
                 TMP=$(mktemp)
                 echo "$SCRIPT_CONTENT" > "$TMP"
                 
@@ -232,42 +255,32 @@ setup_wizard() {
                     cat "$TMP" | su -c "cat > $FILE_PATH" && success "Saved $FILE_PATH (Root)"
                 fi
                 rm "$TMP"
-            fi
+
+                echo -e "${W}Add another script? [y/n]${N}"
+                echo -ne "${Y}> ${N}" 
+                read -u 3 -e AGAIN
+                if [[ "$AGAIN" != "y" ]]; then break; fi
+                ((COUNT++))
+            done
         fi
     fi
+}
 
-    # Save Config
-    msg "Saving Configuration..."
+# Setup Wizard (Sequential)
+setup_wizard() {
+    header
+    echo -e "${W}>>> CONFIGURATION WIZARD${N}"
+    echo -e "${C}------------------------------${N}"
     
-    # Construct JSON
-    JSON_PKGS=$(printf '%s\n' "${PACKAGES[@]}" | jq -R . | jq -s .)
+    configure_packages
+    configure_links
+    configure_webhook
+    configure_settings
+    configure_autoexec
     
-    if [ "$PS_MODE" == "same" ]; then
-        JSON_PS=$(jq -n --arg m "$PS_MODE" --arg u "$PS_URL" '{mode: $m, url: $u, urls: {}}')
-    else
-        JSON_URLS="{}"
-        for pkg in "${!PS_URLS[@]}"; do
-            JSON_URLS=$(echo "$JSON_URLS" | jq --arg k "$pkg" --arg v "${PS_URLS[$pkg]}" '.[$k] = $v')
-        done
-        JSON_PS=$(jq -n --arg m "$PS_MODE" --argjson u "$JSON_URLS" '{mode: $m, url: "", urls: $u}')
-    fi
-
-    JSON_WEBHOOK=$(jq -n --argjson en $WH_ENABLED --arg u "$WH_URL" --arg m "$WH_MODE" --argjson i $WH_INTERVAL '{enabled: $en, url: $u, mode: $m, interval: $i}')
-    JSON_TIMING=$(jq -n --argjson ld $LAUNCH_DELAY --argjson ri $RESET_INT '{launch_delay: $ld, reset_interval: $ri}')
-    JSON_SETTINGS=$(jq -n --argjson mu $MASKING '{masking: $mu, enable_swap: true, swap_size_mb: 2048, enable_cpu_boost: true}')
-
-    jq -n \
-        --argjson pkgs "$JSON_PKGS" \
-        --argjson ps "$JSON_PS" \
-        --argjson wh "$JSON_WEBHOOK" \
-        --argjson tm "$JSON_TIMING" \
-        --argjson set "$JSON_SETTINGS" \
-        '{packages: $pkgs, private_servers: $ps, webhook: $wh, timing: $tm, settings: $st}' \
-        > "$CONFIG_FILE"
-
     success "Configuration Saved!"
     echo -e "${W}Press Enter to return...${N}" 
-    read -r dummy
+    read -u 3 -e dummy
 }
 
 # Edit Configuration Sub-Menu
@@ -293,89 +306,43 @@ edit_config_menu() {
         echo -e "${W}Webhook:        ${C}$WH_ENABLED${N}"
         echo -e "${C}------------------------------${N}"
         
-        echo -e "${C}1.${W} View Package List"
-        echo -e "${C}2.${W} Edit Config File (Nano)"
-        echo -e "${C}3.${W} Manage Auto-Execute"
-        echo -e "${C}4.${W} Back to Main Menu"
+        echo -e "${C}1.${W} Package List"
+        echo -e "${C}2.${W} Private Server URLs"
+        echo -e "${C}3.${W} Webhook Settings"
+        echo -e "${C}4.${W} Other Settings (Mask, Delay, etc.)"
+        echo -e "${C}5.${W} Manage Auto-Execute Scripts"
+        echo -e "${C}6.${W} View Full Configuration"
+        echo -e "${C}7.${W} Back to Main Menu"
         echo -e "${C}------------------------------${N}"
-        echo -ne "${Y}Select [1-4]: ${N}" 
-        read -r SUB_OPT
+        echo -ne "${Y}Select [1-7]: ${N}" 
+        read -u 3 -e SUB_OPT
 
         case $SUB_OPT in
-            1) # View Packages
-                msg "Package List"
-                if [ -f "$CONFIG_FILE" ]; then
-                    jq -r '.packages[]' "$CONFIG_FILE" | nl
-                else
-                    error "No config found."
-                fi
+            1) # Edit Packages
+                configure_packages
                 ;;
-            2) # Edit Config File
-                msg "Opening Nano..."
-                if command -v nano >/dev/null; then
-                    nano "$CONFIG_FILE"
-                else
-                    error "Nano not installed. Please install nano."
-                fi
+            2) # Edit Private Servers
+                configure_links
                 ;;
-            3) # Manage Auto-Execute
-                msg "Manage Auto-Execute"
-                echo -e "${W}Select Executor:${N}"
-                echo -e "1. Delta"
-                echo -e "2. Fluxus"
-                echo -ne "${Y}> ${N}" 
-                read -r EXEC_SEL
-                
-                TARGET_DIR=""
-                if [ "$EXEC_SEL" == "1" ]; then
-                    TARGET_DIR="/sdcard/Delta/Autoexecute"
-                elif [ "$EXEC_SEL" == "2" ]; then
-                    TARGET_DIR="/sdcard/FluxusZ/autoexec"
-                else
-                    error "Invalid selection"
-                    continue
-                fi
-                
-                if [ -n "$TARGET_DIR" ]; then
-                    msg "Target: $TARGET_DIR"
-                    mkdir -p "$TARGET_DIR" 2>/dev/null || su -c "mkdir -p $TARGET_DIR"
-                    
-                    echo -e "${W}[1] Create New Script${N}"
-                    echo -e "${W}[2] Delete All Scripts in Folder${N}"
-                    echo -ne "${Y}> ${N}" 
-                    read -r ACTION
-                    
-                    if [ "$ACTION" == "1" ]; then
-                        echo -e "${W}Filename (e.g. script.txt):${N}"
-                        echo -ne "${Y}> ${N}" 
-                        read -r FNAME
-                        echo -e "${W}Paste content (END to finish):${N}"
-                        CONTENT=""
-                        while IFS= read -r line; do
-                            [ "$line" == "END" ] && break
-                            CONTENT+="$line"$'\n'
-                        done
-                        
-                        FILE_PATH="$TARGET_DIR/$FNAME"
-                        TMP=$(mktemp)
-                        echo "$CONTENT" > "$TMP"
-                        if cp "$TMP" "$FILE_PATH" 2>/dev/null; then
-                            success "Saved $FILE_PATH"
-                        else
-                            cat "$TMP" | su -c "cat > $FILE_PATH" && success "Saved $FILE_PATH (Root)"
-                        fi
-                        rm "$TMP"
-                    elif [ "$ACTION" == "2" ]; then
-                        rm "$TARGET_DIR"/*.txt 2>/dev/null || su -c "rm $TARGET_DIR/*.txt"
-                        success "Cleared scripts in $TARGET_DIR"
-                    fi
-                fi
+            3) # Edit Webhook
+                configure_webhook
                 ;;
-            4) return ;;
+            4) # Other Settings
+                configure_settings
+                ;;
+            5) # Manage Auto-Execute
+                configure_autoexec
+                ;;
+            6) # View Full Config
+                msg "Full Configuration"
+                jq '.' "$CONFIG_FILE"
+                read -u 3 -e dummy
+                ;;
+            7) return ;;
             *) error "Invalid Option" ;;
         esac
         echo -e "${W}Press Enter to continue...${N}" 
-        read -r dummy
+        read -u 3 -e dummy
     done
 }
 
@@ -389,7 +356,7 @@ while true; do
     echo -e "${C}5.${W} Exit"
     echo -e "${C}------------------------------${N}"
     echo -ne "${Y}Select [1-5]: ${N}" 
-    read -r OPT
+    read -u 3 -e OPT
 
     case $OPT in
         1) setup_wizard ;;
@@ -399,7 +366,7 @@ while true; do
             else
                 error "Config not found! Run Setup first."
                 echo -e "${W}Press Enter...${N}" 
-                read -r dummy
+                read -u 3 -e dummy
             fi
             ;;
         3) 
@@ -408,7 +375,7 @@ while true; do
             else
                 error "run.sh not found!"
                 echo -e "${W}Press Enter...${N}" 
-                read -r dummy
+                read -u 3 -e dummy
             fi
             ;;
         4)
