@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 7.1 (Auto-Exec Loop Fix)
+# Version 7.2 (Link Input Fix)
 
 # Redirect stdin to FD 3 to prevent read skipping in loops
 exec 3<&0
@@ -35,7 +35,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v7.1 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v7.2 ===${N}"
     echo ""
 }
 
@@ -99,7 +99,7 @@ configure_links() {
     msg "Private Servers"
     
     # Load packages from config to ensure we have the latest list
-    mapfile -t PACKAGES < <(jq -r '.packages[]' "$CONFIG_FILE")
+    mapfile -t PACKAGES < <(jq -r '.packages[] // empty' "$CONFIG_FILE")
     
     echo -e "${W}Use 1 Private Link for ALL accounts? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
@@ -119,7 +119,8 @@ configure_links() {
         jq '.private_servers.mode = "per_package"' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
         rm -f "$TMP"
 
-        for pkg in "${PACKAGES[@]}"; do
+        for ((i=0; i<${#PACKAGES[@]}; i++)); do
+            local pkg="${PACKAGES[$i]}"
             local user=$(get_username "$pkg")
             local display="$pkg"
             [ -n "$user" ] && display="$pkg ($user)"
