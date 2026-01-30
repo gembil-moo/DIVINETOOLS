@@ -103,9 +103,10 @@ setup_wizard() {
             
             echo "-----------------------------------"
             echo -e "${W}Account: $PKG${N}"
-            echo -e "${W}Username: ${user:-Unknown}${N}"
-            echo -e "${W}Input VIP Link > ${N}"
-            echo -ne "${Y}> ${N}"
+            echo -e "${W}Username: ${user:-Unknown}${N}" 
+            # Gunakan prompt yang jelas dan baca baris penuh
+            echo -e "${W}Input VIP Link (Press Enter to skip):${N}"
+            echo -ne "${Y}> ${N}" 
             read -u 3 -e LINK
             PS_URLS["$PKG"]="$LINK"
         done
