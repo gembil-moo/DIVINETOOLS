@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 5.7 (Nano Batch Fix)
+# Version 5.8 (One-by-One Fix)
 
 # Colors
 C='\033[1;36m' # Cyan
@@ -16,12 +16,12 @@ mkdir -p config
 header() {
     clear
     echo -e "${C}"
-    echo "   ___  _____    _(_)___  ___ "
+    echo "   ___  _____    _(_)___  ___"
     echo "  / _ \/  _/ |  / / / _ \/ _ \\"
     echo " / // // / | | / / / // /  __/"
-    echo "/____/___/ |___/_/_//_/\___/ "
+    echo "/____/___/ |___/_/_/_//_/\\___/"
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v5.7 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v5.8 ===${N}"
     echo ""
 }
 
@@ -92,37 +92,17 @@ setup_wizard() {
         echo -ne "> "
         read PS_URL
     else
-        # NANO BATCH EDIT MODE
-        msg "Batch Edit Mode"
-        echo -e "${W}[*] Opening list in Nano. Please paste your VIP Links after the '=' sign.${N}"
-        echo -e "${W}[*] Press CTRL+X, then Y, then ENTER to save and exit.${N}"
-        read -p "Press Enter to open Nano..."
-        
-        TMP_LINKS="setup_links.tmp"
-        > "$TMP_LINKS" # Clear file
-
         for pkg in "${PACKAGES[@]}"; do
             if [ -n "$pkg" ]; then
-                echo "$pkg=" >> "$TMP_LINKS"
+                local user=$(get_username "$pkg")
+                local display="$pkg"
+                [ -n "$user" ] && display="$pkg ($user)"
+                echo -e "${W}Link for $display:${N}"
+                echo -ne "> "
+                read LINK
+                PS_URLS["$pkg"]="$LINK"
             fi
         done
-
-        if command -v nano >/dev/null; then
-            nano "$TMP_LINKS"
-        else
-            error "Nano not found! Please install nano (pkg install nano)."
-            rm "$TMP_LINKS"
-            return
-        fi
-
-        # Parse the file back
-        while IFS='=' read -r pkg link; do
-            if [ -n "$pkg" ] && [ -n "$link" ]; then
-                PS_URLS["$pkg"]="$link"
-            fi
-        done < "$TMP_LINKS"
-        
-        rm "$TMP_LINKS"
     fi
 
     # 3. Username Masking
