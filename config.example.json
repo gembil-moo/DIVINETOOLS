@@ -1,13 +1,27 @@
 {
-  "project_name": "DivineTools AutoFarm",
-  "version": "2.0",
-  "package_name": "com.roblox.client",
-  "activity_name": "com.roblox.client.Activity",
-  "private_server_link": "https://www.roblox.com/share?code=1234567890&type=Server",
+  "packages": [
+    "com.roblox.client",
+    "com.roblox.client.clone1"
+  ],
+  "private_servers": {
+    "mode": "same",
+    "url": "https://www.roblox.com/share?code=1234567890&type=Server",
+    "urls": {}
+  },
+  "webhook": {
+    "enabled": false,
+    "url": "",
+    "mode": "new",
+    "interval": 5,
+    "tag_everyone": false
+  },
+  "timing": {
+    "launch_delay": 5,
+    "reset_interval": 0
+  },
   "settings": {
     "enable_swap": true,
     "swap_size_mb": 2048,
-    "enable_cpu_boost": true,
-    "rejoin_delay_seconds": 1800
+    "enable_cpu_boost": true
   }
 }
