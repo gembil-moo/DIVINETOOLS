@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - ENGINE & DASHBOARD
-# Version 5.2 (Kaeru Replica)
+# Version 5.4 (Kaeru Replica)
 
 # --- COLORS ---
 C='\033[1;36m' # Cyan
@@ -44,7 +44,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_/_//_/\\___/"
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v5.2 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v5.4 ===${N}"
     echo ""
 }
 
@@ -68,10 +68,18 @@ mask_string() {
 }
 
 # --- SYSTEM OPTIMIZATION ---
-setup_environment() {
-    # 1. Swap Manager
+optimize_system() {
+    echo -e "${C}[*] Optimizing System...${N}"
+    
+    # 1. RAM Cleaner
+    if command -v su >/dev/null; then
+        su -c "sync; echo 3 > /proc/sys/vm/drop_caches" >/dev/null 2>&1
+    fi
+
+    # 2. Swap Manager
     if [ "$SWAP" == "true" ]; then
         if ! su -c "[ -f /data/swapfile ]"; then
+            echo -e "${Y}    -> Creating 2GB Swap...${N}"
             su -c "dd if=/dev/zero of=/data/swapfile bs=1M count=2048" >/dev/null 2>&1
             su -c "mkswap /data/swapfile" >/dev/null 2>&1
             su -c "chmod 600 /data/swapfile" >/dev/null 2>&1
@@ -79,17 +87,20 @@ setup_environment() {
         su -c "swapon /data/swapfile" >/dev/null 2>&1
     fi
 
-    # 2. CPU Boost
+    # 3. CPU Boost
     if [ "$ENABLE_BOOST" == "true" ]; then
-        su -c "sync; echo 3 > /proc/sys/vm/drop_caches" >/dev/null 2>&1
         for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
             su -c "echo performance > $cpu" >/dev/null 2>&1
         done
     fi
+    sleep 1
 }
 
 # --- LAUNCHER LOGIC ---
 launch_sequence() {
+    header
+    optimize_system
+    
     header
     echo -e "${C}[*] Launching $TOTAL Accounts...${N}"
     
@@ -159,7 +170,7 @@ draw_dashboard() {
         
         # Info Rows
         printf "${C}|${W} System                ${C}|${W} Checking [%s/%s] ${C}|${N}\n" "$online_cnt" "$TOTAL"
-        printf "${C}|${W} Memory                ${C}|${W} Free: %4sMB  ${C}|${N}\n" "$free_mem"
+        printf "${C}|${W} Memory                ${C}|${W} Free: %4sMB (%s%%)${C}|${N}\n" "$free_mem" "$mem_pct"
         echo -e "${C}+-----------------------+----------------+${N}"
 
         # Data Rows
@@ -183,6 +194,5 @@ draw_dashboard() {
 }
 
 # --- MAIN EXECUTION ---
-setup_environment
 launch_sequence
 draw_dashboard

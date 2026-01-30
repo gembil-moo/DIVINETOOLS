@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 5.2
+# Version 5.3
 
 # Colors
 C='\033[1;36m' # Cyan
@@ -16,12 +16,12 @@ mkdir -p config
 header() {
     clear
     echo -e "${C}"
-    echo "    ___  _____   _(_)___  ___ "
-    echo "   / _ \/  _/ | / / / _ \/ _ \\"
-    echo "  / // // / | |/ / / // /  __/"
-    echo " /____/___/ |___/_/_//_/\___/ "
+    echo "   ___  _____    _(_)___  ___"
+    echo "  / _ \/  _/ |  / / / _ \/ _ \\"
+    echo " / // // / | | / / / // /  __/"
+    echo "/____/___/ |___/_/_/_//_/\\___/"
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v5.2 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v5.3 ===${N}"
     echo ""
 }
 
@@ -234,6 +234,203 @@ setup_wizard() {
     read -p "Press Enter to return..."
 }
 
+# Edit Configuration Sub-Menu
+edit_config_menu() {
+    while true; do
+        header
+        
+        # Load current config for summary
+        if [ -f "$CONFIG_FILE" ]; then
+            PKG_COUNT=$(jq '.packages | length' "$CONFIG_FILE")
+            PS_MODE=$(jq -r '.private_servers.mode' "$CONFIG_FILE")
+            WH_ENABLED=$(jq -r '.webhook.enabled' "$CONFIG_FILE")
+        else
+            PKG_COUNT=0
+            PS_MODE="N/A"
+            WH_ENABLED="false"
+        fi
+
+        echo -e "${W}>>> EDIT CONFIGURATION${N}"
+        echo -e "${C}------------------------------${N}"
+        echo -e "${W}Packages:       ${C}$PKG_COUNT configured${N}"
+        echo -e "${W}Private Server: ${C}$PS_MODE${N}"
+        echo -e "${W}Webhook:        ${C}$WH_ENABLED${N}"
+        echo -e "${C}------------------------------${N}"
+        
+        echo -e "${C}1.${W} Package List"
+        echo -e "${C}2.${W} Private Server URLs"
+        echo -e "${C}3.${W} Webhook Settings"
+        echo -e "${C}4.${W} Other Settings (Mask, Delay, etc.)"
+        echo -e "${C}5.${W} Manage Auto-Execute Scripts"
+        echo -e "${C}6.${W} View Full Configuration"
+        echo -e "${C}7.${W} Back to Main Menu"
+        echo -e "${C}------------------------------${N}"
+        read -p "Select [1-7]: " SUB_OPT
+
+        case $SUB_OPT in
+            1) # Edit Packages
+                msg "Edit Package List"
+                echo -e "${W}Current Packages:${N}"
+                jq -r '.packages[]' "$CONFIG_FILE" | nl
+                echo ""
+                echo -e "${W}Options: [a] Add, [r] Remove, [c] Clear All, [b] Back${N}"
+                read -p "> " PKG_ACTION
+                
+                if [[ "$PKG_ACTION" == "a" ]]; then
+                    echo -e "${W}Enter package name to add:${N}"
+                    read -p "> " NEW_PKG
+                    if [ -n "$NEW_PKG" ]; then
+                        TMP=$(mktemp)
+                        jq --arg pkg "$NEW_PKG" '.packages += [$pkg]' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+                        success "Added $NEW_PKG"
+                    fi
+                elif [[ "$PKG_ACTION" == "r" ]]; then
+                    echo -e "${W}Enter index to remove (1-based):${N}"
+                    read -p "> " IDX
+                    if [[ "$IDX" =~ ^[0-9]+$ ]]; then
+                        TMP=$(mktemp)
+                        jq "del(.packages[$(($IDX-1))])" "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+                        success "Removed package at index $IDX"
+                    fi
+                elif [[ "$PKG_ACTION" == "c" ]]; then
+                    TMP=$(mktemp)
+                    jq '.packages = []' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+                    success "Cleared all packages"
+                fi
+                ;;
+            2) # Edit Private Servers
+                msg "Edit Private Servers"
+                echo -e "${W}Current Mode: $PS_MODE${N}"
+                echo -e "${W}Change Mode? [y/n]${N}"
+                read -p "> " CHG_MODE
+                
+                if [[ "$CHG_MODE" =~ ^[Yy]$ ]]; then
+                    echo -e "${W}Use 1 Link for ALL? [y/n]${N}"
+                    read -p "> " ONE_LINK
+                    if [[ "$ONE_LINK" =~ ^[Yy]$ ]]; then
+                        echo -e "${W}Enter VIP Link:${N}"
+                        read -p "> " URL
+                        TMP=$(mktemp)
+                        jq --arg url "$URL" '.private_servers.mode = "same" | .private_servers.url = $url' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+                    else
+                        TMP=$(mktemp)
+                        jq '.private_servers.mode = "per_package"' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+                        
+                        # Loop through packages to set URLs
+                        mapfile -t PKGS < <(jq -r '.packages[]' "$CONFIG_FILE")
+                        for pkg in "${PKGS[@]}"; do
+                            echo -e "${W}Link for $pkg:${N}"
+                            read -p "> " LINK
+                            TMP2=$(mktemp)
+                            jq --arg pkg "$pkg" --arg link "$LINK" '.private_servers.urls[$pkg] = $link' "$CONFIG_FILE" > "$TMP2" && mv "$TMP2" "$CONFIG_FILE"
+                        done
+                    fi
+                    success "Private Server settings updated"
+                fi
+                ;;
+            3) # Edit Webhook
+                msg "Edit Webhook"
+                echo -e "${W}Enable Webhook? [y/n]${N}"
+                read -p "> " WH_OPT
+                if [[ "$WH_OPT" =~ ^[Yy]$ ]]; then
+                    echo -e "${W}URL:${N}"
+                    read -p "> " URL
+                    echo -e "${W}Mode (1.New/2.Edit):${N}"
+                    read -p "> " M_OPT
+                    MODE="new"
+                    [[ "$M_OPT" == "2" ]] && MODE="edit"
+                    echo -e "${W}Interval (min):${N}"
+                    read -p "> " INT
+                    
+                    TMP=$(mktemp)
+                    jq --arg url "$URL" --arg mode "$MODE" --argjson int "$INT" \
+                       '.webhook = {enabled: true, url: $url, mode: $mode, interval: $int}' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+                else
+                    TMP=$(mktemp)
+                    jq '.webhook.enabled = false' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+                fi
+                success "Webhook settings updated"
+                ;;
+            4) # Other Settings
+                msg "Edit Other Settings"
+                echo -e "${W}Mask Usernames? [y/n]${N}"
+                read -p "> " MASK
+                MASK_BOOL=false
+                [[ "$MASK" =~ ^[Yy]$ ]] && MASK_BOOL=true
+                
+                echo -e "${W}Launch Delay (s):${N}"
+                read -p "> " DELAY
+                
+                echo -e "${W}Reset Interval (m):${N}"
+                read -p "> " RESET
+                
+                TMP=$(mktemp)
+                jq --argjson mask $MASK_BOOL --argjson delay "$DELAY" --argjson reset "$RESET" \
+                   '.settings.masking = $mask | .timing.launch_delay = $delay | .timing.reset_interval = $reset' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+                success "Settings updated"
+                ;;
+            5) # Manage Auto-Execute
+                msg "Manage Auto-Execute"
+                echo -e "${W}Select Executor:${N}"
+                echo -e "1. Delta"
+                echo -e "2. Fluxus"
+                read -p "> " EXEC_SEL
+                
+                TARGET_DIR=""
+                if [ "$EXEC_SEL" == "1" ]; then
+                    TARGET_DIR="/sdcard/Delta/Autoexecute"
+                elif [ "$EXEC_SEL" == "2" ]; then
+                    TARGET_DIR="/sdcard/FluxusZ/autoexec"
+                else
+                    error "Invalid selection"
+                    continue
+                fi
+                
+                if [ -n "$TARGET_DIR" ]; then
+                    msg "Target: $TARGET_DIR"
+                    mkdir -p "$TARGET_DIR" 2>/dev/null || su -c "mkdir -p $TARGET_DIR"
+                    
+                    echo -e "${W}[1] Create New Script${N}"
+                    echo -e "${W}[2] Delete All Scripts in Folder${N}"
+                    read -p "> " ACTION
+                    
+                    if [ "$ACTION" == "1" ]; then
+                        echo -e "${W}Filename (e.g. script.txt):${N}"
+                        read -p "> " FNAME
+                        echo -e "${W}Paste content (END to finish):${N}"
+                        CONTENT=""
+                        while IFS= read -r line; do
+                            [ "$line" == "END" ] && break
+                            CONTENT+="$line"$'\n'
+                        done
+                        
+                        FILE_PATH="$TARGET_DIR/$FNAME"
+                        TMP=$(mktemp)
+                        echo "$CONTENT" > "$TMP"
+                        if cp "$TMP" "$FILE_PATH" 2>/dev/null; then
+                            success "Saved $FILE_PATH"
+                        else
+                            cat "$TMP" | su -c "cat > $FILE_PATH" && success "Saved $FILE_PATH (Root)"
+                        fi
+                        rm "$TMP"
+                    elif [ "$ACTION" == "2" ]; then
+                        rm "$TARGET_DIR"/*.txt 2>/dev/null || su -c "rm $TARGET_DIR/*.txt"
+                        success "Cleared scripts in $TARGET_DIR"
+                    fi
+                fi
+                ;;
+            6) # View Full Config
+                msg "Full Configuration"
+                jq '.' "$CONFIG_FILE"
+                read -p "Press Enter..."
+                ;;
+            7) return ;;
+            *) error "Invalid Option" ;;
+        esac
+        read -p "Press Enter to continue..."
+    done
+}
+
 # Main Menu
 while true; do
     header
@@ -246,7 +443,15 @@ while true; do
     read -p "Select [1-5]: " OPT
 
     case $OPT in
-        1|2) setup_wizard ;;
+        1) setup_wizard ;;
+        2) 
+            if [ -f "$CONFIG_FILE" ]; then
+                edit_config_menu
+            else
+                error "Config not found! Run Setup first."
+                read -p "Press Enter..."
+            fi
+            ;;
         3) 
             if [ -f "run.sh" ]; then
                 bash run.sh
