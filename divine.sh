@@ -16,14 +16,11 @@ mkdir -p config
 header() {
     clear
     echo -e "${C}"
-    echo "  ██████╗ ██╗██╗   ██╗██╗███╗   ██╗███████╗"
-    echo "  ██╔══██╗██║██║   ██║██║████╗  ██║██╔════╝"
-    echo "  ██║  ██║██║██║   ██║██║██╔██╗ ██║█████╗  "
-    echo "  ██║  ██║██║╚██╗ ██╔╝██║██║╚██╗██║██╔══╝  "
-    echo "  ██████╔╝██║ ╚████╔╝ ██║██║ ╚████║███████╗"
-    echo "  ╚═════╝ ╚═╝  ╚═══╝  ╚═╝╚═╝  ╚═══╝╚══════╝"
-    echo -e "           ${C}DIVINE TOOLS v4.2${N}"
-    echo -e "${C}=============================================${N}"
+    echo "█▀▄ █ █ █ █▄ █ █▀"
+    echo "█▄▀ █ ▀▄▀ █ ▀█ █▄▄"
+    echo -e "${N}"
+    echo -e "${C}=== DIVINE TOOLS v4.2 ===${N}"
+    echo ""
 }
 
 msg() { echo -e "${C}[*] ${W}$1${N}"; }
@@ -115,9 +112,9 @@ setup() {
             su -c "mkdir -p $TARGET_DIR"
             TMP=$(mktemp)
             echo "$SCRIPT" > "$TMP"
-            cat "$TMP" | su -c "cat > $TARGET_DIR/divine_script.txt"
+            cat "$TMP" | su -c "cat > $TARGET_DIR/divine_script.lua"
             rm "$TMP"
-            success "Saved to $TARGET_DIR/divine_script.txt"
+            success "Saved to $TARGET_DIR/divine_script.lua"
         fi
     fi
 

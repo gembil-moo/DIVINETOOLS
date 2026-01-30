@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - ENGINE & DASHBOARD
-# Version 4.4 (Advanced Grid)
+# Version 4.5 (Auto-Grid & Identity)
 
 # --- COLORS ---
 C='\033[1;36m' # Cyan
@@ -141,8 +141,13 @@ launch_sequence() {
 draw_dashboard() {
     while true; do
         clear
-        # 1. MINI HEADER
-        echo -e "${C}=== DIVINE TOOLS v4 ===${N}"
+        # 1. HEADER (Compact Block Style - Max 40 chars)
+        echo -e "${C}"
+        echo "█▀▄ █ █ █ █▄ █ █▀"
+        echo "█▄▀ █ ▀▄▀ █ ▀█ █▄▄"
+        echo -e "${N}"
+        echo -e "${C}=== PREMIUM FARM MANAGER ===${N}"
+        echo ""
         
         # 2. SYSTEM & MEMORY BOXES
         # Get Memory Info
