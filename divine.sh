@@ -47,13 +47,13 @@ setup_wizard() {
     # 1. Package Detection
     msg "Package Detection"
     echo -e "${W}Auto Detect [a] or Manual [m]?${N}"
-    read -p "> " PKG_OPT
+    read -r -p "> " PKG_OPT
     PKG_OPT=${PKG_OPT:-a}
 
     PACKAGES=()
     if [[ "$PKG_OPT" =~ ^[Mm]$ ]]; then
         echo -e "${W}Enter package names (space separated):${N}"
-        read -p "> " MANUAL_PKGS
+        read -r -p "> " MANUAL_PKGS
         IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
     else
         msg "Scanning..."
@@ -75,7 +75,7 @@ setup_wizard() {
     echo ""
     msg "Private Servers"
     echo -e "${W}Use 1 Private Link for ALL accounts? [y/n]${N}"
-    read -p "> " ONE_LINK
+    read -r -p "> " ONE_LINK
 
     PS_MODE="per_package"
     PS_URL=""
@@ -84,14 +84,14 @@ setup_wizard() {
     if [[ "$ONE_LINK" =~ ^[Yy]$ ]]; then
         PS_MODE="same"
         echo -e "${W}Enter VIP Link:${N}"
-        read -p "> " PS_URL
+        read -r -p "> " PS_URL
     else
         for pkg in "${PACKAGES[@]}"; do
             local user=$(get_username "$pkg")
             local display="$pkg"
             [ -n "$user" ] && display="$pkg ($user)"
             echo -e "${W}Link for $display:${N}"
-            read -p "> " LINK
+            read -r -p "> " LINK
             PS_URLS["$pkg"]="$LINK"
         done
     fi
@@ -313,17 +313,22 @@ edit_config_menu() {
                         TMP=$(mktemp)
                         jq --arg url "$URL" '.private_servers.mode = "same" | .private_servers.url = $url' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
                     else
-                        TMP=$(mktemp)
-                        jq '.private_servers.mode = "per_package"' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
-                        
                         # Loop through packages to set URLs
                         mapfile -t PKGS < <(jq -r '.packages[]' "$CONFIG_FILE")
+                        declare -A NEW_URLS
                         for pkg in "${PKGS[@]}"; do
                             echo -e "${W}Link for $pkg:${N}"
-                            read -p "> " LINK
-                            TMP2=$(mktemp)
-                            jq --arg pkg "$pkg" --arg link "$LINK" '.private_servers.urls[$pkg] = $link' "$CONFIG_FILE" > "$TMP2" && mv "$TMP2" "$CONFIG_FILE"
+                            read -r -p "> " LINK
+                            NEW_URLS["$pkg"]="$LINK"
                         done
+                        
+                        JSON_URLS="{}"
+                        for pkg in "${!NEW_URLS[@]}"; do
+                            JSON_URLS=$(echo "$JSON_URLS" | jq --arg k "$pkg" --arg v "${NEW_URLS[$pkg]}" '.[$k] = $v')
+                        done
+                        
+                        TMP=$(mktemp)
+                        jq --argjson urls "$JSON_URLS" '.private_servers.mode = "per_package" | .private_servers.urls = $urls' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
                     fi
                     success "Private Server settings updated"
                 fi
