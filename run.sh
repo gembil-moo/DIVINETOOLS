@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - ENGINE & DASHBOARD
-# Version 6.0 (Ultimate Optimization)
+# Version 6.1 (Robust Config Load)
 
 # --- COLORS ---
 C='\033[1;36m' # Cyan
@@ -27,7 +27,10 @@ PS_MODE=$(jq -r '.private_servers.mode // "same"' "$CONF_FILE")
 PS_URL_ALL=$(jq -r '.private_servers.url // ""' "$CONF_FILE")
 
 # Load packages into array
-mapfile -t PACKAGES < <(jq -r '.packages[] // empty' "$CONF_FILE")
+PACKAGES=()
+while IFS= read -r line; do
+    [[ -n "$line" ]] && PACKAGES+=("$line")
+done < <(jq -r '.packages[] // empty' "$CONF_FILE")
 TOTAL=${#PACKAGES[@]}
 
 if [ "$TOTAL" -eq 0 ]; then
@@ -44,7 +47,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_/_//_/\\___/"
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v5.4 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v6.1 ===${N}"
     echo ""
 }
 

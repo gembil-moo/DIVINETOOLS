@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 7.2 (Link Input Fix)
+# Version 7.3 (Robust Loop Fix)
 
 # Redirect stdin to FD 3 to prevent read skipping in loops
 exec 3<&0
@@ -14,6 +14,12 @@ N='\033[0m'    # Reset
 
 CONFIG_FILE="config/config.json"
 mkdir -p config
+
+# Initialize Config if missing
+if ! command -v jq &> /dev/null; then
+    echo -e "${R}[!] jq is not installed. Please run install.sh${N}"
+    exit 1
+fi
 
 # Initialize Config if missing
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -35,7 +41,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v7.2 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v7.3 ===${N}"
     echo ""
 }
 
@@ -98,8 +104,18 @@ configure_links() {
     # 2. Private Server Links
     msg "Private Servers"
     
-    # Load packages from config to ensure we have the latest list
-    mapfile -t PACKAGES < <(jq -r '.packages[] // empty' "$CONFIG_FILE")
+    # Reload packages safely to ensure the array is populated
+    if [ ${#PACKAGES[@]} -eq 0 ]; then
+        PACKAGES=()
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && PACKAGES+=("$line")
+        done < <(jq -r '.packages[] // empty' "$CONFIG_FILE")
+    fi
+
+    if [ ${#PACKAGES[@]} -eq 0 ]; then
+        error "No packages found! Please configure packages first."
+        return
+    fi
     
     echo -e "${W}Use 1 Private Link for ALL accounts? [y/n]${N}"
     echo -ne "${Y}> ${N}" 
