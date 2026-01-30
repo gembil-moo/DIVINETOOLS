@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 5.8 (One-by-One Fix)
+# Version 5.9 (Redfinger Fix)
 
 # Colors
 C='\033[1;36m' # Cyan
@@ -21,7 +21,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_/_//_/\\___/"
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v5.8 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v5.9 ===${N}"
     echo ""
 }
 
@@ -47,14 +47,14 @@ setup_wizard() {
     # 1. Package Detection
     msg "Package Detection"
     echo -e "${W}Auto Detect [a] or Manual [m]?${N}"
-    echo -ne "> "
+    echo -ne "${Y}> ${N}"
     read PKG_OPT
     PKG_OPT=${PKG_OPT:-a}
 
     PACKAGES=()
     if [[ "$PKG_OPT" =~ ^[Mm]$ ]]; then
         echo -e "${W}Enter package names (space separated):${N}"
-        echo -ne "> "
+        echo -ne "${Y}> ${N}"
         read MANUAL_PKGS
         IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
     else
@@ -67,7 +67,7 @@ setup_wizard() {
         if [ ${#PACKAGES[@]} -eq 0 ]; then
             error "No packages found!"
             echo -e "${W}Enter manually:${N}"
-            echo -ne "> "
+            echo -ne "${Y}> ${N}"
             read MANUAL_PKGS
             IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
         else
@@ -79,7 +79,7 @@ setup_wizard() {
     echo ""
     msg "Private Servers"
     echo -e "${W}Use 1 Private Link for ALL accounts? [y/n]${N}"
-    echo -ne "> "
+    echo -ne "${Y}> ${N}"
     read ONE_LINK
 
     PS_MODE="per_package"
@@ -89,7 +89,7 @@ setup_wizard() {
     if [[ "$ONE_LINK" =~ ^[Yy]$ ]]; then
         PS_MODE="same"
         echo -e "${W}Enter VIP Link:${N}"
-        echo -ne "> "
+        echo -ne "${Y}> ${N}"
         read PS_URL
     else
         for pkg in "${PACKAGES[@]}"; do
@@ -98,7 +98,7 @@ setup_wizard() {
                 local display="$pkg"
                 [ -n "$user" ] && display="$pkg ($user)"
                 echo -e "${W}Link for $display:${N}"
-                echo -ne "> "
+                echo -ne "${Y}> ${N}"
                 read LINK
                 PS_URLS["$pkg"]="$LINK"
             fi
@@ -109,7 +109,7 @@ setup_wizard() {
     echo ""
     msg "Dashboard Settings"
     echo -e "${W}Mask Usernames in Dashboard? (e.g. DIxxxNE) [y/n]${N}"
-    echo -ne "> "
+    echo -ne "${Y}> ${N}"
     read MASK_OPT
     MASKING=false
     [[ "$MASK_OPT" =~ ^[Yy]$ ]] && MASKING=true
@@ -118,7 +118,7 @@ setup_wizard() {
     echo ""
     msg "Webhook Settings"
     echo -e "${W}Enable Webhook? [y/n]${N}"
-    echo -ne "> "
+    echo -ne "${Y}> ${N}"
     read WH_OPT
     
     WH_ENABLED=false
@@ -129,17 +129,17 @@ setup_wizard() {
     if [[ "$WH_OPT" =~ ^[Yy]$ ]]; then
         WH_ENABLED=true
         echo -e "${W}Webhook URL:${N}"
-        echo -ne "> "
+        echo -ne "${Y}> ${N}"
         read WH_URL
         
         echo -e "${W}Mode (1. Send New, 2. Edit):${N}"
-        echo -ne "> "
+        echo -ne "${Y}> ${N}"
         read WH_MODE_OPT
         [[ "$WH_MODE_OPT" == "2" ]] && WH_MODE="edit"
 
         while true; do
             echo -e "${W}Interval (min 5 mins):${N}"
-            echo -ne "> "
+            echo -ne "${Y}> ${N}"
             read WH_INTERVAL
             if [[ "$WH_INTERVAL" =~ ^[0-9]+$ ]] && [ "$WH_INTERVAL" -ge 5 ]; then
                 break
@@ -153,13 +153,13 @@ setup_wizard() {
     echo ""
     msg "Timing Settings"
     echo -e "${W}Launch Delay (seconds)? (Default 30)${N}"
-    echo -ne "> "
+    echo -ne "${Y}> ${N}"
     read LAUNCH_DELAY
     LAUNCH_DELAY=${LAUNCH_DELAY:-30}
     if [ "$LAUNCH_DELAY" -lt 30 ]; then LAUNCH_DELAY=30; fi
 
     echo -e "${W}Reset Interval (minutes)? (0=Off)${N}"
-    echo -ne "> "
+    echo -ne "${Y}> ${N}"
     read RESET_INT
     RESET_INT=${RESET_INT:-0}
 
@@ -167,14 +167,14 @@ setup_wizard() {
     echo ""
     msg "Auto-Execute Script"
     echo -e "${W}Configure Auto-Execute Script? [y/n]${N}"
-    echo -ne "> "
+    echo -ne "${Y}> ${N}"
     read AUTO_EXEC_OPT
 
     if [[ "$AUTO_EXEC_OPT" =~ ^[Yy]$ ]]; then
         echo -e "${W}Select Executor:${N}"
         echo -e "1. Delta"
         echo -e "2. Fluxus"
-        echo -ne "> "
+        echo -ne "${Y}> ${N}"
         read EXEC_SEL
         
         TARGET_DIR=""
@@ -191,7 +191,7 @@ setup_wizard() {
             mkdir -p "$TARGET_DIR" 2>/dev/null || su -c "mkdir -p $TARGET_DIR"
             
             echo -e "${W}Create one script for all? [y/n]${N}"
-            echo -ne "> "
+            echo -ne "${Y}> ${N}"
             read CREATE_SCRIPT
             
             if [[ "$CREATE_SCRIPT" =~ ^[Yy]$ ]]; then
@@ -247,7 +247,7 @@ setup_wizard() {
         > "$CONFIG_FILE"
 
     success "Configuration Saved!"
-    echo -ne "Press Enter to return..."
+    echo -e "${W}Press Enter to return...${N}"
     read
 }
 
@@ -279,7 +279,7 @@ edit_config_menu() {
         echo -e "${C}3.${W} Manage Auto-Execute"
         echo -e "${C}4.${W} Back to Main Menu"
         echo -e "${C}------------------------------${N}"
-        echo -ne "Select [1-4]: "
+        echo -ne "${Y}Select [1-4]: ${N}"
         read SUB_OPT
 
         case $SUB_OPT in
@@ -304,7 +304,7 @@ edit_config_menu() {
                 echo -e "${W}Select Executor:${N}"
                 echo -e "1. Delta"
                 echo -e "2. Fluxus"
-                echo -ne "> "
+                echo -ne "${Y}> ${N}"
                 read EXEC_SEL
                 
                 TARGET_DIR=""
@@ -323,12 +323,12 @@ edit_config_menu() {
                     
                     echo -e "${W}[1] Create New Script${N}"
                     echo -e "${W}[2] Delete All Scripts in Folder${N}"
-                    echo -ne "> "
+                    echo -ne "${Y}> ${N}"
                     read ACTION
                     
                     if [ "$ACTION" == "1" ]; then
                         echo -e "${W}Filename (e.g. script.txt):${N}"
-                        echo -ne "> "
+                        echo -ne "${Y}> ${N}"
                         read FNAME
                         echo -e "${W}Paste content (END to finish):${N}"
                         CONTENT=""
@@ -355,7 +355,7 @@ edit_config_menu() {
             4) return ;;
             *) error "Invalid Option" ;;
         esac
-        echo -ne "Press Enter to continue..."
+        echo -e "${W}Press Enter to continue...${N}"
         read
     done
 }
@@ -369,7 +369,7 @@ while true; do
     echo -e "${C}4.${W} Clear All App Caches"
     echo -e "${C}5.${W} Exit"
     echo -e "${C}------------------------------${N}"
-    echo -ne "Select [1-5]: "
+    echo -ne "${Y}Select [1-5]: ${N}"
     read OPT
 
     case $OPT in
@@ -379,7 +379,7 @@ while true; do
                 edit_config_menu
             else
                 error "Config not found! Run Setup first."
-                echo -ne "Press Enter..."
+                echo -e "${W}Press Enter...${N}"
                 read
             fi
             ;;
@@ -388,7 +388,7 @@ while true; do
                 bash run.sh
             else
                 error "run.sh not found!"
-                echo -ne "Press Enter..."
+                echo -e "${W}Press Enter...${N}"
                 read
             fi
             ;;
