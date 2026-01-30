@@ -1,6 +1,6 @@
 #!/bin/bash
 # DIVINE TOOLS - AUTOMATION
-# Version 7.3 (Prompt & Config Fix)
+# Version 7.2 (Pkg Display Fix)
 
 # Redirect stdin to FD 3 to prevent read skipping in loops
 exec 3<&0
@@ -35,7 +35,7 @@ header() {
     echo " / // // / | | / / / // /  __/"
     echo "/____/___/ |___/_/_//_/\___/ "
     echo -e "${N}"
-    echo -e "${C}=== DIVINE TOOLS v7.3 ===${N}"
+    echo -e "${C}=== DIVINE TOOLS v7.2 ===${N}"
     echo ""
 }
 
@@ -60,13 +60,13 @@ configure_packages() {
     jq -r '.packages[]' "$CONFIG_FILE" | nl
 
     # 1. Package Detection
-    echo -e "${W}Auto Detect Packages? [y/n]${N}"
+    echo -e "${W}Auto Detect [a] or Manual [m]?${N}"
     echo -ne "${Y}> ${N}" 
     read -u 3 -e PKG_OPT
-    PKG_OPT=${PKG_OPT:-y}
+    PKG_OPT=${PKG_OPT:-a}
 
     PACKAGES=()
-    if [[ "$PKG_OPT" =~ ^[Nn]$ ]]; then
+    if [[ "$PKG_OPT" =~ ^[Mm]$ ]]; then
         echo -e "${W}Enter package names (space separated):${N}"
         echo -ne "${Y}> ${N}"
         read -u 3 -e MANUAL_PKGS
@@ -85,17 +85,16 @@ configure_packages() {
             IFS=' ' read -r -a PACKAGES <<< "$MANUAL_PKGS"
         else
             success "Found ${#PACKAGES[@]} packages."
+            echo -e "${W}Detected Packages:${N}"
+            for i in "${!PACKAGES[@]}"; do
+                echo "  [$((i+1))] ${PACKAGES[$i]}"
+            done
         fi
     fi
 
     # Save Packages immediately
     TMP=$(mktemp)
-    if [ ${#PACKAGES[@]} -eq 0 ]; then
-        JSON_PKGS="[]"
-    else
-        JSON_PKGS=$(printf '%s\n' "${PACKAGES[@]}" | jq -R . | jq -s .)
-    fi
-    jq --argjson pkgs "$JSON_PKGS" '.packages = $pkgs' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+    jq --argjson pkgs "$(printf '%s\n' "${PACKAGES[@]}" | jq -R . | jq -s .)" '.packages = $pkgs' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
     rm -f "$TMP"
 }
 
@@ -134,11 +133,10 @@ configure_links() {
 
         for pkg in "${PACKAGES[@]}"; do
             local user=$(get_username "$pkg")
+            local display="$pkg"
+            [ -n "$user" ] && display="$pkg ($user)"
             
-            echo -e "${C}------------------------------${N}"
-            echo -e "${W}Pkg : ${C}${pkg}${N}"
-            [ -n "$user" ] && echo -e "${W}User: ${C}${user}${N}"
-            echo -e "${W}Input Link:${N}"
+            echo -e "${W}Link for $display:${N}"
             echo -ne "${Y}> ${N}" 
             read -u 3 -e LINK
             
@@ -251,8 +249,7 @@ configure_autoexec() {
             
             COUNT=1
             while true; do
-                echo -e "${W}Paste content for script_${COUNT}.txt${N}"
-                echo -e "${W}(Type 'END' on new line to finish):${N}"
+                echo -e "${W}Paste content for script_${COUNT}.txt (Type 'END' on new line to finish):${N}"
                 SCRIPT_CONTENT=""
                 while IFS= read -u 3 -e line; do
                     [ "$line" == "END" ] && break
